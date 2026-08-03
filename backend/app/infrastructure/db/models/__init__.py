@@ -1,4 +1,14 @@
-from app.infrastructure.db.models.ai import AiCoachIntake, AiSessionSummary, AiSuggestion, AiTrainingPlan
+from app.infrastructure.db.models.ai import (
+    AiCoachIntake,
+    AiSessionSummary,
+    AiSuggestion,
+    AiTrainingPlan,
+    CoachConversation,
+    CoachMemoryEvent,
+    CoachPlannedSession,
+    CoachProfile,
+    CoachProposal,
+)
 from app.infrastructure.db.models.auth import RefreshToken
 from app.infrastructure.db.models.exercise import Equipment, Exercise, MuscleGroup
 from app.infrastructure.db.models.rank import Rank, UserRankProgress
@@ -12,6 +22,11 @@ __all__ = [
     "AiCoachIntake",
     "AiSessionSummary",
     "AiTrainingPlan",
+    "CoachConversation",
+    "CoachMemoryEvent",
+    "CoachPlannedSession",
+    "CoachProfile",
+    "CoachProposal",
     "Exercise",
     "MuscleGroup",
     "Rank",

@@ -21,6 +21,12 @@ from app.application.ai_coach_intake_service import (
     AiCoachIntakeCannotGenerateError,
     ai_coach_intake_service,
 )
+from app.application.coach_v2_service import (
+    CoachV2CannotGenerateError,
+    CoachV2ProposalNotFoundError,
+    CoachV2ProposalNotPendingError,
+    coach_v2_service,
+)
 from app.application.ai_session_summary_service import (
     AiSessionSummaryCannotGenerateError,
     AiSessionSummaryNotFoundError,
@@ -42,11 +48,90 @@ from app.domain.ai import (
     AiTrainingPlanGenerateRequest,
     AiTrainingPlanModifyRequest,
     AiTrainingPlanRead,
+    CoachPlannedSessionRead,
+    CoachProposalRead,
+    CoachV2MessageRequest,
+    CoachV2StateRead,
 )
 from app.infrastructure.db.models.user import User
 from app.infrastructure.db.session import get_db
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+@router.get("/coach/v2", response_model=CoachV2StateRead)
+def get_coach_v2_state(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return coach_v2_service.get_state(db, current_user)
+
+
+@router.post("/coach/v2/messages", response_model=CoachV2StateRead)
+def add_coach_v2_message(
+    data: CoachV2MessageRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return coach_v2_service.add_message(db, current_user, data)
+
+
+@router.post("/coach/v2/generate-plan", response_model=AiTrainingPlanRead, status_code=status.HTTP_201_CREATED)
+def generate_coach_v2_plan(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    try:
+        return coach_v2_service.generate_plan(db, current_user)
+    except CoachV2CannotGenerateError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/coach/v2/planned-sessions/generate", response_model=CoachPlannedSessionRead, status_code=status.HTTP_201_CREATED)
+def generate_coach_v2_planned_session(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    try:
+        return coach_v2_service.generate_planned_session(db, current_user)
+    except CoachV2CannotGenerateError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/coach/v2/proposals/{proposal_id}/accept", response_model=CoachProposalRead)
+def accept_coach_v2_proposal(
+    proposal_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    try:
+        return coach_v2_service.accept_proposal(db, proposal_id, current_user)
+    except CoachV2ProposalNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found.") from error
+    except CoachV2ProposalNotPendingError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Proposal is not pending.") from error
+
+
+@router.post("/coach/v2/proposals/{proposal_id}/reject", response_model=CoachProposalRead)
+def reject_coach_v2_proposal(
+    proposal_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    try:
+        return coach_v2_service.reject_proposal(db, proposal_id, current_user)
+    except CoachV2ProposalNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found.") from error
+    except CoachV2ProposalNotPendingError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Proposal is not pending.") from error
+
+
+@router.post("/coach/v2/reset", response_model=CoachV2StateRead)
+def reset_coach_v2(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return coach_v2_service.reset(db, current_user)
 
 
 @router.post("/suggestions/generate", response_model=list[AiSuggestionRead], status_code=status.HTTP_201_CREATED)

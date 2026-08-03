@@ -73,6 +73,10 @@ TrainingPlanGoal = Literal["strength", "hypertrophy", "fat_loss", "general_healt
 TrainingPlanLevel = Literal["beginner", "intermediate", "advanced"]
 TrainingPlanStatus = Literal["draft", "accepted", "rejected"]
 AiCoachIntakeStatus = Literal["collecting", "ready", "plan_generated"]
+CoachV2Goal = Literal["strength", "hypertrophy", "fat_loss", "general_health", "endurance"]
+CoachV2Sex = Literal["male", "female"]
+CoachV2Phase = Literal["onboarding", "plan_ready", "training_active", "progress_review", "fatigue_review", "adjustment_review"]
+CoachProposalStatus = Literal["pending", "accepted", "rejected", "expired"]
 
 
 class AiTrainingPlanGenerateRequest(BaseModel):
@@ -159,6 +163,110 @@ class AiCoachIntakeRead(BaseModel):
     model: str | None = None
     fallback_used: bool = False
     updated_at: datetime
+
+
+class CoachV2MessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1_200)
+    personal_data_acknowledged: bool = False
+    sensitive_data_acknowledged: bool = False
+
+    @model_validator(mode="after")
+    def normalize_message(self) -> "CoachV2MessageRequest":
+        self.message = self.message.strip()
+        return self
+
+
+class CoachV2ProfileRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    goal: str | None
+    secondary_goal: str | None
+    plan_horizon_weeks: int | None
+    biological_sex: str | None
+    age: int | None
+    height_cm: int | None
+    weight_kg: int | None
+    experience_level: str | None
+    training_age_months: int | None
+    days_per_week: int | None
+    session_duration_minutes: int | None
+    equipment: list[str]
+    priorities: list[str]
+    preferred_exercises: list[str]
+    avoided_exercises: list[str]
+    physical_limitations: str | None
+    sleep_quality: str | None
+    stress_level: str | None
+    current_fatigue: str | None
+    personal_data_acknowledged: bool
+    sensitive_data_acknowledged: bool
+    memory_summary: str | None
+    updated_at: datetime
+
+
+class CoachV2MessageRead(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class CoachV2ConversationRead(BaseModel):
+    id: UUID
+    user_id: UUID
+    phase: CoachV2Phase
+    last_question: str | None
+    recent_messages: list[CoachV2MessageRead]
+    conversation_summary: str | None
+    updated_at: datetime
+
+
+class CoachMemoryEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    event_type: str
+    summary: str
+    payload: dict[str, Any]
+    created_at: datetime
+
+
+class CoachProposalRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    type: str
+    status: CoachProposalStatus
+    recommendation: str
+    explanation: str
+    payload: dict[str, Any]
+    created_at: datetime
+    reviewed_at: datetime | None
+
+
+class CoachPlannedSessionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    title: str
+    session_payload: dict[str, Any]
+    rationale: str
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class CoachV2StateRead(BaseModel):
+    profile: CoachV2ProfileRead
+    conversation: CoachV2ConversationRead
+    assistant_message: str
+    missing_required_fields: list[str]
+    ready_for_plan: bool
+    memory_events: list[CoachMemoryEventRead]
+    proposals: list[CoachProposalRead]
+    planned_sessions: list[CoachPlannedSessionRead]
+    privacy_notice: str
+    next_action: str | None = None
 
 
 class AiSessionSummaryRead(BaseModel):

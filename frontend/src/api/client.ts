@@ -179,6 +179,69 @@ export type AiCoachIntakeMessageRequest = {
   sensitive_data_acknowledged: boolean;
 };
 
+export type CoachV2Profile = {
+  id: string;
+  user_id: string;
+  goal: string | null;
+  secondary_goal: string | null;
+  plan_horizon_weeks: number | null;
+  biological_sex: 'male' | 'female' | null;
+  age: number | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  experience_level: string | null;
+  training_age_months: number | null;
+  days_per_week: number | null;
+  session_duration_minutes: number | null;
+  equipment: string[];
+  priorities: string[];
+  preferred_exercises: string[];
+  avoided_exercises: string[];
+  physical_limitations: string | null;
+  sleep_quality: string | null;
+  stress_level: string | null;
+  current_fatigue: string | null;
+  personal_data_acknowledged: boolean;
+  sensitive_data_acknowledged: boolean;
+  memory_summary: string | null;
+  updated_at: string;
+};
+
+export type CoachV2Message = { role: 'user' | 'assistant'; content: string };
+
+export type CoachV2Conversation = {
+  id: string;
+  user_id: string;
+  phase: 'onboarding' | 'plan_ready' | 'training_active' | 'progress_review' | 'fatigue_review' | 'adjustment_review';
+  last_question: string | null;
+  recent_messages: CoachV2Message[];
+  conversation_summary: string | null;
+  updated_at: string;
+};
+
+export type CoachMemoryEvent = { id: string; event_type: string; summary: string; payload: Record<string, unknown>; created_at: string };
+export type CoachProposal = { id: string; type: string; status: 'pending' | 'accepted' | 'rejected' | 'expired'; recommendation: string; explanation: string; payload: Record<string, unknown>; created_at: string; reviewed_at: string | null };
+export type CoachPlannedSession = { id: string; status: string; title: string; session_payload: Record<string, unknown>; rationale: string; created_at: string; completed_at: string | null };
+
+export type CoachV2State = {
+  profile: CoachV2Profile;
+  conversation: CoachV2Conversation;
+  assistant_message: string;
+  missing_required_fields: string[];
+  ready_for_plan: boolean;
+  memory_events: CoachMemoryEvent[];
+  proposals: CoachProposal[];
+  planned_sessions: CoachPlannedSession[];
+  privacy_notice: string;
+  next_action: string | null;
+};
+
+export type CoachV2MessageRequest = {
+  message: string;
+  personal_data_acknowledged: boolean;
+  sensitive_data_acknowledged: boolean;
+};
+
 export type TrainingPlanGoal = 'strength' | 'hypertrophy' | 'fat_loss' | 'general_health' | 'endurance';
 export type TrainingPlanLevel = 'beginner' | 'intermediate' | 'advanced';
 export type TrainingPlanStatus = 'draft' | 'accepted' | 'rejected';
@@ -779,6 +842,34 @@ export function generateTrainingPlanFromCoachIntake() {
 
 export function resetCoachIntake() {
   return request<AiCoachIntake>('/ai/coach/intake/reset', { method: 'POST', auth: true });
+}
+
+export function getCoachV2State() {
+  return request<CoachV2State>('/ai/coach/v2', { auth: true });
+}
+
+export function sendCoachV2Message(payload: CoachV2MessageRequest) {
+  return request<CoachV2State>('/ai/coach/v2/messages', { method: 'POST', auth: true, body: payload });
+}
+
+export function generateCoachV2Plan() {
+  return request<AiTrainingPlan>('/ai/coach/v2/generate-plan', { method: 'POST', auth: true });
+}
+
+export function generateCoachV2PlannedSession() {
+  return request<CoachPlannedSession>('/ai/coach/v2/planned-sessions/generate', { method: 'POST', auth: true });
+}
+
+export function acceptCoachV2Proposal(proposalId: string) {
+  return request<CoachProposal>(`/ai/coach/v2/proposals/${proposalId}/accept`, { method: 'POST', auth: true });
+}
+
+export function rejectCoachV2Proposal(proposalId: string) {
+  return request<CoachProposal>(`/ai/coach/v2/proposals/${proposalId}/reject`, { method: 'POST', auth: true });
+}
+
+export function resetCoachV2() {
+  return request<CoachV2State>('/ai/coach/v2/reset', { method: 'POST', auth: true });
 }
 
 export function generateTrainingPlan(payload: AiTrainingPlanGenerateRequest) {

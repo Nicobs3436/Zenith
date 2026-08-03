@@ -90,3 +90,87 @@ class AiCoachIntake(Base):
     sensitive_data_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class CoachProfile(Base):
+    __tablename__ = "coach_profiles"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_coach_profiles_user_id"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), index=True)
+    goal: Mapped[str | None] = mapped_column(String(40))
+    secondary_goal: Mapped[str | None] = mapped_column(String(40))
+    plan_horizon_weeks: Mapped[int | None] = mapped_column(Integer)
+    biological_sex: Mapped[str | None] = mapped_column(String(10))
+    age: Mapped[int | None] = mapped_column(Integer)
+    height_cm: Mapped[int | None] = mapped_column(Integer)
+    weight_kg: Mapped[int | None] = mapped_column(Integer)
+    experience_level: Mapped[str | None] = mapped_column(String(40))
+    training_age_months: Mapped[int | None] = mapped_column(Integer)
+    days_per_week: Mapped[int | None] = mapped_column(Integer)
+    session_duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    equipment: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    priorities: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    preferred_exercises: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    avoided_exercises: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    physical_limitations: Mapped[str | None] = mapped_column(Text)
+    sleep_quality: Mapped[str | None] = mapped_column(String(20))
+    stress_level: Mapped[str | None] = mapped_column(String(20))
+    current_fatigue: Mapped[str | None] = mapped_column(String(20))
+    personal_data_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sensitive_data_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    memory_summary: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class CoachConversation(Base):
+    __tablename__ = "coach_conversations"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_coach_conversations_user_id"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), index=True)
+    phase: Mapped[str] = mapped_column(String(40), nullable=False, default="onboarding", index=True)
+    last_question: Mapped[str | None] = mapped_column(String(80))
+    recent_messages: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    conversation_summary: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class CoachMemoryEvent(Base):
+    __tablename__ = "coach_memory_events"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), index=True)
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class CoachProposal(Base):
+    __tablename__ = "coach_proposals"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), index=True)
+    type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    recommendation: Mapped[str] = mapped_column(Text, nullable=False)
+    explanation: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CoachPlannedSession(Base):
+    __tablename__ = "coach_planned_sessions"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="planned", index=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    session_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

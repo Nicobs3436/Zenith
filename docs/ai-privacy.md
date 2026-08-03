@@ -2,7 +2,7 @@
 
 ## Decision Actual
 
-- Fase implementada: entrenador interno con proveedor opcional Ollama local para sugerencias, entrevista conversacional, planes, resumenes y preguntas guiadas.
+- Fase implementada: Coach V2 conversacional continuo con proveedor interno, mas proveedor opcional Ollama local para sugerencias, planes, resumenes y preguntas guiadas legacy.
 - Proveedor por defecto: reglas locales dentro del backend.
 - Proveedor opcional: Ollama local configurado con `APP_AI_PROVIDER=ollama`.
 - Modelo por defecto Ollama: `llama3.2`.
@@ -19,6 +19,7 @@
 - Series estructuradas: reps, peso/unidad, RPE/RIR y descanso.
 - Para planes adaptativos: objetivo, nivel, dias disponibles, duracion, equipamiento disponible, prioridades, catalogo estructurado de ejercicios accesibles y limitaciones fisicas si el usuario las confirma explicitamente.
 - Para entrevista conversacional del Coach: resumen estructurado de objetivo, nivel, dias, duracion, equipamiento, prioridades y limitaciones solo con confirmacion; se guardan solo los ultimos mensajes necesarios, no el historial completo.
+- Para Coach V2: perfil estructurado con objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion, equipamiento, prioridades, ejercicios evitados y limitaciones solo con aviso confirmado. Se guarda memoria resumida, propuestas y ultimos mensajes necesarios, no historial completo.
 - Para modificar planes adaptativos: la instruccion libre del usuario, el resumen estructurado del plan original y los mismos campos de planificacion; no se usan notas, email, username ni tokens.
 - Para resumenes post-sesion: fecha, rutina asociada si existe, series estructuradas, reps, peso/unidad, RPE/RIR, descanso y agregados por ejercicio/unidad; no se usan notas.
 - Para preguntas guiadas al entrenador: tipo de pregunta, ids opcionales de rutina/ejercicio/sesion, rutinas activas, sesiones recientes, metricas agregadas y sugerencias pendientes; el detalle libre solo marca `detail_present` y no se envia al proveedor ni se guarda.
@@ -57,6 +58,8 @@ Cada sugerencia guarda:
 - El backend valida el `plan_payload` completo antes de persistirlo, exige ejercicios accesibles y rangos seguros, rechaza planes redundantes o con volumen incoherente y reintenta una reparacion antes de usar fallback interno.
 - La entrevista conversacional `POST /ai/coach/intake/messages` persiste un unico intake activo por usuario con resumen estructurado, ultimos mensajes, campos faltantes y estado `ready_for_plan`; no crea rutinas ni sesiones.
 - `POST /ai/coach/intake/generate-plan` solo genera un plan borrador si el intake contiene objetivo, nivel, dias por semana y duracion; reutiliza la validacion estricta de planes adaptativos.
+- `POST /ai/coach/v2/generate-plan` solo genera un plan borrador si el perfil contiene los datos obligatorios. El plan sigue siendo revisable y solo crea rutinas reales al aceptar.
+- Coach V2 puede crear propuestas automaticas y sesiones futuras recomendadas; no aplica cambios ni registra sesiones historicas sin accion del usuario.
 - Generar un resumen post-sesion crea o actualiza `AiSessionSummary`; no modifica sesiones, series ni rutinas.
 - En resumenes post-sesion, Ollama solo puede enriquecer textos/listas del resumen; no aplica cambios.
 - Las preguntas guiadas `POST /ai/coach/questions` son stateless: no se persisten, no crean sugerencias y no modifican rutinas, sesiones, series ni planes.

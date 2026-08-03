@@ -29,12 +29,13 @@ Aplicacion movil/web para gestionar rutinas de gimnasio, registrar sesiones, con
 - `app/api/routines.py`: rutinas, sesiones, edicion y soft delete.
 - `app/api/stats.py`: estadisticas por ejercicio y periodo.
 - `app/api/ranks.py`: rangos y recalculo manual.
-- `app/api/ai.py`: generacion, listado, aceptacion y rechazo de sugerencias de progresion, entrevista conversacional, planes adaptativos, resumenes post-sesion y preguntas guiadas al entrenador.
+- `app/api/ai.py`: Coach V2, sugerencias de progresion, entrevista legacy, planes adaptativos, resumenes post-sesion y preguntas guiadas legacy.
 - `app/application/routine_service.py`: creacion, reemplazo completo, borrado logico y recalculo de rango tras cambios de sesion.
 - `app/application/stats_service.py`: agregaciones de sets/reps/volumen/carga.
 - `app/application/rank_service.py`: score, rango actual, siguiente rango y snapshots.
 - `app/application/ai_coach_service.py`: entrenador interno/local, reglas de progresion y aplicacion validada de sugerencias aceptadas.
 - `app/application/ai_coach_intake_service.py`: entrevista conversacional con persistencia minima, resumen estructurado y generacion de plan cuando el intake esta listo.
+- `app/application/coach_v2_service.py`: entrenador conversacional continuo, perfil profesional, memoria resumida, propuestas automaticas, planes y sesiones recomendadas.
 - `app/application/ai_coach_question_service.py`: respuestas stateless a preguntas guiadas con contexto estructurado y sin persistencia.
 - `app/application/ai_training_plan_service.py`: creador de planes adaptativos, validacion de estructura, enriquecimiento IA opcional y creacion de rutinas reales al aceptar.
 - `app/application/ai_session_summary_service.py`: resumenes post-sesion con metricas estructuradas, privacidad y fallback IA.
@@ -102,6 +103,7 @@ Aplicacion movil/web para gestionar rutinas de gimnasio, registrar sesiones, con
 - El entrenador personal genera planes adaptativos con una rutina por dia disponible; aceptar crea rutinas reales, rechazar no modifica datos. Con Ollama local, la IA puede proponer la estructura completa del plan usando el catalogo accesible; el backend valida ejercicios, volumen, rangos, coherencia, privacidad y usa fallback interno si la propuesta no es valida.
 - La entrevista conversacional del Coach guarda un unico `AiCoachIntake` por usuario con resumen estructurado, ultimos mensajes necesarios, campos faltantes y estado `ready_for_plan`; no guarda historial completo ni modifica datos por si sola.
 - El plan desde intake solo se genera si estan completos objetivo, nivel, dias por semana y duracion; despues sigue el mismo flujo de borrador revisable y aceptacion explicita.
+- Coach V2 reemplaza el frontend visible del entrenador: requiere perfil cientifico minimo con sexo biologico, edad, altura, peso, objetivo, nivel, dias, duracion y equipamiento; guarda memoria resumida y puede proponer revisiones automaticas o sesiones futuras.
 - El resumen post-sesion analiza solo datos estructurados de una sesion activa propia; excluye notas y no modifica datos historicos.
 - Las preguntas guiadas al entrenador (`next_workout`, `progression`, `fatigue`, `routine_review`, `stats_explanation`) responden sin persistir historial, sin chat libre y sin modificar datos.
 - En preguntas guiadas, el detalle libre no se envia a proveedores ni se incluye en `input_summary`; solo se usa contexto estructurado propio.

@@ -101,6 +101,16 @@
 - `recent_messages` guarda solo los ultimos mensajes necesarios para continuar la entrevista; no es historial completo.
 - No crea rutinas, sesiones ni series. Solo permite generar un `AiTrainingPlan` borrador cuando faltantes obligatorios esta vacio.
 
+### CoachProfile / CoachConversation / CoachMemoryEvent / CoachProposal / CoachPlannedSession
+
+- Coach V2 reemplaza la experiencia visible del entrenador.
+- `CoachProfile` guarda perfil estructurado: objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion, equipamiento, prioridades, ejercicios preferidos/evitados, limitaciones confirmadas y memoria resumida.
+- `CoachConversation` guarda fase, ultima pregunta y ultimos mensajes necesarios; no es historial completo.
+- `CoachMemoryEvent` guarda decisiones importantes resumidas.
+- `CoachProposal` guarda propuestas automaticas revisables: revision de fatiga, progreso, ajuste o recomendacion.
+- `CoachPlannedSession` guarda sesiones futuras recomendadas que no son sesiones historicas registradas.
+- Coach V2 no crea rutinas reales hasta aceptar un `AiTrainingPlan` borrador.
+
 ### AiSessionSummary
 
 - Campos: `id`, `user_id`, `session_id`, `summary`, `improvements`, `drops`, `warnings`, `next_recommendation`, `input_summary`, `provider`, `model`, `fallback_used`, `created_at`.
@@ -120,6 +130,7 @@
 - Una sugerencia IA puede apuntar a un ejercicio planificado y se aplica solo si la rutina sigue activa y pertenece al usuario.
 - Un plan IA pertenece a un usuario; al aceptarlo crea rutinas privadas de ese usuario. Una version modificada referencia el plan origen en `input_summary`.
 - Un intake de Coach pertenece a un usuario y puede crear un plan IA borrador si esta listo; no crea rutinas por si solo.
+- Un `CoachProfile` pertenece a un usuario; propuestas, memoria y sesiones planificadas tambien se filtran por usuario.
 - Un resumen IA pertenece a una sesion del usuario; sesiones borradas o ajenas no se resumen ni se leen.
 
 ## Estadisticas Calculadas
@@ -152,4 +163,5 @@
 - Sugerencias IA guardan trazabilidad, no usan `notes`, no mezclan unidades, validan ejercicios alternativos accesibles y no modifican sesiones historicas.
 - Planes IA requieren confirmacion explicita para limitaciones fisicas o modificaciones sensibles, no sustituyen consejo medico/profesional y solo crean rutinas al aceptar.
 - Intake conversacional no genera planes sin objetivo, nivel, dias por semana y duracion; redacta mensajes sensibles no confirmados.
+- Coach V2 no genera planes sin objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion y equipamiento; entiende respuestas cortas por contexto y gimnasio comercial.
 - Resumenes post-sesion IA no usan notas, no mezclan unidades, no modifican datos historicos y respetan ownership de sesiones.

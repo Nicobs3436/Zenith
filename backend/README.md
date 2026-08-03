@@ -88,6 +88,13 @@ API FastAPI para la gestion de rutinas de gimnasio, registros de entrenamiento y
 - `POST /ai/training-plans/{plan_id}/modify` — crea una nueva version borrador del plan con la instruccion del usuario.
 - `POST /ai/session-summaries/{session_id}/generate` — genera o actualiza un resumen IA de una sesion propia.
 - `GET /ai/session-summaries/{session_id}` — obtiene el resumen IA generado de una sesion propia.
+- `GET /ai/coach/v2` — obtiene el estado del Coach V2, perfil, memoria, propuestas y sesiones recomendadas.
+- `POST /ai/coach/v2/messages` — conversa con Coach V2 y actualiza el perfil resumido.
+- `POST /ai/coach/v2/generate-plan` — genera un plan borrador desde el perfil V2 si estan los datos obligatorios.
+- `POST /ai/coach/v2/planned-sessions/generate` — genera una proxima sesion recomendada desde el plan actual.
+- `POST /ai/coach/v2/proposals/{proposal_id}/accept` — acepta una propuesta automatica del Coach.
+- `POST /ai/coach/v2/proposals/{proposal_id}/reject` — rechaza una propuesta automatica del Coach.
+- `POST /ai/coach/v2/reset` — reinicia perfil y conversacion del Coach V2.
 - `GET /ai/coach/intake` — obtiene o crea la entrevista conversacional minima del entrenador.
 - `POST /ai/coach/intake/messages` — anade un mensaje al intake y actualiza el resumen estructurado.
 - `POST /ai/coach/intake/generate-plan` — genera un plan borrador desde el intake si ya tiene los campos obligatorios.
@@ -148,6 +155,8 @@ API FastAPI para la gestion de rutinas de gimnasio, registros de entrenamiento y
 - En planes adaptativos, Ollama puede generar la estructura completa del plan usando el catalogo accesible de ejercicios; el backend valida ids, volumen, rangos, coherencia y privacidad antes de guardar.
 - El chat del entrenador usa `AiCoachIntake`: un unico intake activo por usuario con resumen estructurado, ultimos mensajes necesarios, campos faltantes y estado de preparacion para generar plan.
 - El plan desde chat solo se genera si objetivo, nivel, dias por semana y duracion estan completos; crear el borrador no modifica rutinas hasta aceptarlo.
+- Coach V2 reemplaza la experiencia visible del entrenador: usa `CoachProfile`, `CoachConversation`, memoria resumida, propuestas automaticas y sesiones planificadas.
+- Coach V2 exige objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion y equipamiento para generar un plan cientifico revisable.
 - Los resumenes post-sesion devuelven resumen, mejoras, caidas, warnings y proxima recomendacion; no modifican rutinas ni sesiones.
 - Las preguntas guiadas al entrenador responden `next_workout`, `progression`, `fatigue`, `routine_review` y `stats_explanation`; no se persisten, no crean sugerencias y no aplican cambios.
 - En preguntas guiadas, el detalle libre no se envia a Ollama ni se incluye en trazabilidad; solo se usa contexto estructurado propio.
