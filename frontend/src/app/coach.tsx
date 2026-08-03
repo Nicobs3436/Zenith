@@ -6,14 +6,17 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   acceptAiSuggestion,
   acceptTrainingPlan,
+  AiCoachIntake,
   AiCoachQuestionResponse,
   AiCoachQuestionType,
   AiSuggestion,
   AiTrainingPlan,
   askCoachQuestion,
   generateAiSuggestions,
+  generateTrainingPlanFromCoachIntake,
   generateTrainingPlan,
   getAiSuggestions,
+  getCoachIntake,
   getRoutines,
   getTrainingPlan,
   getTrainingPlans,
@@ -21,7 +24,9 @@ import {
   modifyTrainingPlan,
   rejectAiSuggestion,
   rejectTrainingPlan,
+  resetCoachIntake,
   Routine,
+  sendCoachIntakeMessage,
   TrainingPlanGoal,
   TrainingPlanLevel,
   WorkoutSession,
@@ -67,7 +72,7 @@ const QUESTION_TYPES: { label: string; value: AiCoachQuestionType }[] = [
   { label: 'Stats', value: 'stats_explanation' },
 ];
 
-type CoachTab = 'suggestions' | 'questions' | 'plans';
+type CoachTab = 'chat' | 'suggestions' | 'questions' | 'plans';
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -75,10 +80,10 @@ function paramValue(value: string | string[] | undefined) {
 
 function tabFromParam(value: string | string[] | undefined): CoachTab {
   const current = paramValue(value);
-  if (current === 'questions' || current === 'plans') {
+  if (current === 'suggestions' || current === 'questions' || current === 'plans') {
     return current;
   }
-  return 'suggestions';
+  return 'chat';
 }
 
 function splitCsv(value: string) {
@@ -139,6 +144,37 @@ function planDate(value: string | null) {
   return value ? new Date(value).toLocaleString('es-ES') : 'pendiente';
 }
 
+function coachFieldLabel(field: string) {
+  const labels: Record<string, string> = {
+    goal: 'objetivo',
+    level: 'nivel',
+    days_per_week: 'dias/semana',
+    session_duration_minutes: 'minutos/sesion',
+    available_equipment: 'equipamiento',
+    priorities: 'prioridades',
+    physical_limitations: 'limitaciones',
+  };
+  return labels[field] ?? field;
+}
+
+function intakeSummaryText(intake: AiCoachIntake | null) {
+  if (!intake) {
+    return 'Sin resumen todavia.';
+  }
+  const summary = intake.intake_summary;
+  const parts = [
+    ['Objetivo', summary.goal],
+    ['Nivel', summary.level],
+    ['Dias', summary.days_per_week],
+    ['Duracion', summary.session_duration_minutes],
+    ['Equipo', Array.isArray(summary.available_equipment) ? summary.available_equipment.join(', ') : null],
+    ['Prioridades', Array.isArray(summary.priorities) ? summary.priorities.join(', ') : null],
+  ]
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([label, value]) => `${label}: ${value}`);
+  return parts.length > 0 ? parts.join(' · ') : 'Sin resumen todavia.';
+}
+
 function routineNameById(routineId: string | null, routines: Routine[]) {
   if (!routineId) {
     return 'Sesion libre';
@@ -150,6 +186,11 @@ export default function CoachScreen() {
   const { tab } = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState<CoachTab>(() => tabFromParam(tab));
   const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
+  const [intake, setIntake] = useState<AiCoachIntake | null>(null);
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatAcknowledged, setChatAcknowledged] = useState(false);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatGeneratingPlan, setChatGeneratingPlan] = useState(false);
   const [filter, setFilter] = useState<AiSuggestionFilter>('pending');
   const [goal, setGoal] = useState<TrainingPlanGoal>('hypertrophy');
   const [level, setLevel] = useState<TrainingPlanLevel>('beginner');
@@ -194,15 +235,23 @@ export default function CoachScreen() {
     setPlans(items);
   }
 
+  async function loadIntake() {
+    const item = await getCoachIntake();
+    setIntake(item);
+    setChatAcknowledged(item.sensitive_data_acknowledged);
+  }
+
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getAiSuggestions(), getTrainingPlans(), getRoutines(), getWorkoutSessions()])
-      .then(([loadedSuggestions, loadedPlans, loadedRoutines, loadedSessions]) => {
+    Promise.all([getAiSuggestions(), getTrainingPlans(), getRoutines(), getWorkoutSessions(), getCoachIntake()])
+      .then(([loadedSuggestions, loadedPlans, loadedRoutines, loadedSessions, loadedIntake]) => {
         if (!cancelled) {
           setSuggestions(loadedSuggestions);
           setPlans(loadedPlans);
           setRoutines(loadedRoutines);
           setSessions(loadedSessions);
+          setIntake(loadedIntake);
+          setChatAcknowledged(loadedIntake.sensitive_data_acknowledged);
           setQuestionRoutineId((current) => current ?? loadedRoutines[0]?.id ?? null);
         }
       })
@@ -329,6 +378,59 @@ export default function CoachScreen() {
     }
   }
 
+  async function submitChatMessage() {
+    const message = chatMessage.trim();
+    if (!message) {
+      return;
+    }
+    setChatSending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await sendCoachIntakeMessage({ message, sensitive_data_acknowledged: chatAcknowledged });
+      setIntake(response);
+      setChatAcknowledged(response.sensitive_data_acknowledged);
+      setChatMessage('');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo enviar el mensaje al coach.');
+    } finally {
+      setChatSending(false);
+    }
+  }
+
+  async function submitGeneratePlanFromChat() {
+    setChatGeneratingPlan(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await generateTrainingPlanFromCoachIntake();
+      await Promise.all([loadPlans(), loadIntake()]);
+      setActiveTab('plans');
+      setNotice('Plan generado desde el chat. Revisalo y aceptalo para crear rutinas reales.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo generar el plan desde el chat.');
+    } finally {
+      setChatGeneratingPlan(false);
+    }
+  }
+
+  async function submitResetChat() {
+    setChatSending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await resetCoachIntake();
+      setIntake(response);
+      setChatAcknowledged(false);
+      setChatMessage('');
+      setNotice('Entrevista reiniciada.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo reiniciar el chat.');
+    } finally {
+      setChatSending(false);
+    }
+  }
+
   async function submitAcceptPlan(planId: string) {
     setWorking(planId);
     setError(null);
@@ -425,6 +527,9 @@ export default function CoachScreen() {
         <Text style={styles.warningText}>No aceptes cambios si hay dolor, lesion, mareo o tecnica peor. Zenith no sustituye consejo medico ni profesional.</Text>
       </View>
       <View style={styles.tabs}>
+        <Pressable onPress={() => setActiveTab('chat')} style={[styles.tab, activeTab === 'chat' && styles.tabActive]}>
+          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>Chat</Text>
+        </Pressable>
         <Pressable onPress={() => setActiveTab('suggestions')} style={[styles.tab, activeTab === 'suggestions' && styles.tabActive]}>
           <Text style={[styles.tabText, activeTab === 'suggestions' && styles.tabTextActive]}>Sugerencias{pendingSuggestions > 0 ? ` (${pendingSuggestions})` : ''}</Text>
         </Pressable>
@@ -437,6 +542,54 @@ export default function CoachScreen() {
       </View>
       {notice && <ZenithNotice tone="success">{notice}</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
+
+      {activeTab === 'chat' && (
+        <View style={styles.sectionBlock}>
+          <ZenithCard style={styles.chatBox}>
+            <Text style={styles.questionTitle}>Entrenador personal</Text>
+            <Text style={styles.questionText}>Responde por bloques. Zenith guarda solo un resumen estructurado y los ultimos mensajes necesarios.</Text>
+            {loading && <ZenithNotice>Cargando entrevista...</ZenithNotice>}
+            {intake?.assistant_message && intake.recent_messages.length === 0 && <View style={styles.assistantBubble}><Text style={styles.chatText}>{intake.assistant_message}</Text></View>}
+            {intake?.recent_messages.map((message, index) => (
+              <View key={`${message.role}-${index}`} style={message.role === 'user' ? styles.userBubble : styles.assistantBubble}>
+                <Text style={styles.chatText}>{message.content}</Text>
+              </View>
+            ))}
+            {intake?.safety_warning && <ZenithNotice tone="danger">{intake.safety_warning}</ZenithNotice>}
+            <View style={styles.detailBox}>
+              <Text style={styles.detailTitle}>Resumen actual</Text>
+              <Text style={styles.detailText}>{intakeSummaryText(intake)}</Text>
+              {intake && intake.missing_required_fields.length > 0 && <Text style={styles.detailText}>Falta: {intake.missing_required_fields.map(coachFieldLabel).join(', ')}</Text>}
+              {intake && intake.missing_required_fields.length === 0 && intake.useful_missing_fields.length > 0 && <Text style={styles.detailText}>Opcional: {intake.useful_missing_fields.map(coachFieldLabel).join(', ')}</Text>}
+            </View>
+            <Field
+              label="Mensaje al coach"
+              maxLength={1000}
+              multiline
+              onChangeText={setChatMessage}
+              placeholder="Ej: quiero hipertrofia, soy principiante, 3 dias, 60 minutos, tengo mancuernas..."
+              value={chatMessage}
+            />
+            <View style={styles.sensitiveBox}>
+              <Text style={styles.sensitiveTitle}>Limitaciones fisicas</Text>
+              <Text style={styles.sensitiveText}>Si mencionas dolor, lesion o limitaciones, confirma el aviso para que puedan usarse al adaptar el plan. No sustituye consejo medico.</Text>
+              <Pressable onPress={() => setChatAcknowledged((current) => !current)} style={[styles.checkbox, chatAcknowledged && styles.checkboxChecked]}>
+                <Text style={styles.checkboxText}>{chatAcknowledged ? 'Aviso confirmado' : 'Confirmo el aviso si incluyo datos sensibles'}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.actions}>
+              <ZenithButton disabled={chatSending || !chatMessage.trim()} onPress={submitChatMessage} title={chatSending ? 'Enviando...' : 'Enviar'} />
+              <Pressable disabled={!intake?.ready_for_plan || chatGeneratingPlan} onPress={submitGeneratePlanFromChat} style={[styles.acceptButton, (!intake?.ready_for_plan || chatGeneratingPlan) && styles.disabled]}>
+                <Text style={styles.acceptText}>{chatGeneratingPlan ? 'Generando...' : 'Generar plan revisable'}</Text>
+              </Pressable>
+              <Pressable disabled={chatSending} onPress={submitResetChat} style={[styles.rejectButton, chatSending && styles.disabled]}>
+                <Text style={styles.rejectText}>Reiniciar entrevista</Text>
+              </Pressable>
+            </View>
+            {intake && <Text style={styles.providerText}>Proveedor IA: {providerInfo(intake.provider, intake.model, intake.fallback_used)}</Text>}
+          </ZenithCard>
+        </View>
+      )}
 
       {activeTab === 'suggestions' && (
         <View style={styles.sectionBlock}>
@@ -691,6 +844,10 @@ const styles = StyleSheet.create({
   rejectButton: { alignItems: 'center', borderColor: zenith.colors.border, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', padding: 12 },
   rejectText: { color: zenith.colors.muted, fontFamily: zenith.font.bodyBold },
   questionBox: { borderColor: zenith.colors.primaryBorder, gap: 12 },
+  chatBox: { borderColor: zenith.colors.primaryBorder, gap: 12 },
+  assistantBubble: { alignSelf: 'flex-start', backgroundColor: zenith.colors.secondary, borderColor: zenith.colors.border, borderRadius: 16, borderWidth: 1, maxWidth: '92%', padding: 12 },
+  userBubble: { alignSelf: 'flex-end', backgroundColor: zenith.colors.primarySoft, borderColor: zenith.colors.primaryBorder, borderRadius: 16, borderWidth: 1, maxWidth: '92%', padding: 12 },
+  chatText: { color: zenith.colors.foreground, fontFamily: zenith.font.body, lineHeight: 20 },
   questionTitle: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 24, lineHeight: 26, textTransform: 'uppercase' },
   questionText: { color: zenith.colors.muted, fontFamily: zenith.font.body, lineHeight: 20 },
   routineSelector: { gap: 8 },

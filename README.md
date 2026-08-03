@@ -15,7 +15,7 @@ MVP funcional con backend FastAPI y frontend Expo Router:
 - Estadisticas por ejercicio con filtros `7d`, `30d`, `90d` y `all` desde frontend.
 - Rangos por volumen con peso, mejora de 1RM estimado y amplitud de ejercicios progresados.
 - Entrenador IA interno/local con proveedor opcional Ollama local, sugerencias explicables, deload inteligente, cambios de ejercicio, analisis de objetivo por rutina, deduplicacion, expiracion y aplicacion solo al aceptar.
-- Entrenador personal IA para crear planes adaptativos; con Ollama local puede proponer la estructura completa del plan usando el catalogo accesible y el backend la valida antes de convertirla en rutinas reales al aceptar.
+- Entrenador personal IA con chat de entrevista, persistencia minima y creacion de planes adaptativos; con Ollama local puede proponer la estructura completa del plan usando el catalogo accesible y el backend la valida antes de convertirla en rutinas reales al aceptar.
 - Resumenes IA post-sesion con mejoras, caidas, warnings y proxima recomendacion sin modificar datos.
 - Preguntas guiadas al entrenador IA sin persistencia ni cambios automaticos.
 - Pantallas beta de privacidad y terminos, aviso medico visible y aceptacion antes de registro.
@@ -134,7 +134,7 @@ Antes de escanear el QR, abrir desde el movil `http://192.168.1.44:8000/health`.
 - El rango se recalcula automaticamente al crear, editar o borrar una sesion.
 - No hay puntos por sesiones registradas ni semanas activas.
 - IA actual usa reglas internas con Ollama local opcional; no usa notas y solo modifica rutinas cuando el usuario acepta una sugerencia o plan validado.
-- Las preguntas al entrenador son guiadas y stateless; no se guardan ni crean cambios por si solas.
+- El chat del entrenador guarda solo resumen estructurado y ultimos mensajes necesarios; las preguntas guiadas siguen siendo stateless.
 - Las limitaciones fisicas opcionales se tratan como dato sensible: requieren confirmacion y no sustituyen consejo medico/profesional.
 - La beta no incluye eliminacion/exportacion automatica de cuenta; queda pendiente antes de producto publico.
 

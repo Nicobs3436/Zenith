@@ -9,7 +9,7 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - Validacion: Pydantic v2.
 - Frontend: Expo React Native + TypeScript + Expo Router.
 - Tests: pytest para backend; Vitest para helpers frontend.
-- IA actual: entrenador interno/local de progresion, planes adaptativos, resumenes post-sesion y preguntas guiadas con proveedor opcional Ollama local, coste 0, sin proveedor remoto, con deduplicacion/expiracion de sugerencias.
+- IA actual: entrenador interno/local de progresion, chat de entrevista para planes, planes adaptativos, resumenes post-sesion y preguntas guiadas con proveedor opcional Ollama local, coste 0, sin proveedor remoto, con deduplicacion/expiracion de sugerencias.
 
 ## Comandos
 - Backend: ejecutar comandos desde `backend/`.
@@ -49,6 +49,7 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - Anotaciones por sesion y por ejercicio.
 - IA actual sugiere sobrecarga progresiva, deload inteligente, cambios de ejercicio, ajustes de volumen/reps/descanso, analisis de objetivo por rutina y estancamiento; en planes adaptativos Ollama puede proponer la estructura completa usando el catalogo accesible y backend valida antes de guardar; solo modifica rutinas al aceptar una sugerencia o un plan adaptativo.
 - El entrenador personal puede crear planes adaptativos; con Ollama local la IA propone la estructura y el backend valida ids, volumen, rangos, coherencia y privacidad; al aceptar crea rutinas reales, no sesiones.
+- El chat del entrenador guarda solo resumen estructurado y ultimos mensajes necesarios en `AiCoachIntake`; no genera plan hasta tener objetivo, nivel, dias por semana y duracion.
 - Los resumenes post-sesion generan resumen, mejoras, caidas, warnings y proxima recomendacion; no modifican rutinas, sesiones ni series.
 - Las preguntas guiadas al entrenador no se persisten, no crean sugerencias y no modifican rutinas, sesiones, series ni planes; el texto libre de detalle no se envia a proveedores.
 

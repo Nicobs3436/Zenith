@@ -17,6 +17,10 @@ from app.application.ai_coach_question_service import (
     AiCoachQuestionNotFoundError,
     ai_coach_question_service,
 )
+from app.application.ai_coach_intake_service import (
+    AiCoachIntakeCannotGenerateError,
+    ai_coach_intake_service,
+)
 from app.application.ai_session_summary_service import (
     AiSessionSummaryCannotGenerateError,
     AiSessionSummaryNotFoundError,
@@ -29,6 +33,8 @@ from app.application.ai_training_plan_service import (
     ai_training_plan_service,
 )
 from app.domain.ai import (
+    AiCoachIntakeMessageRequest,
+    AiCoachIntakeRead,
     AiCoachQuestionRead,
     AiCoachQuestionRequest,
     AiSessionSummaryRead,
@@ -83,6 +89,42 @@ def answer_coach_question(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Referenced training data not found.") from error
     except AiCoachQuestionCannotAnswerError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.get("/coach/intake", response_model=AiCoachIntakeRead)
+def get_coach_intake(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return ai_coach_intake_service.get_intake(db, current_user)
+
+
+@router.post("/coach/intake/messages", response_model=AiCoachIntakeRead)
+def add_coach_intake_message(
+    data: AiCoachIntakeMessageRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return ai_coach_intake_service.add_message(db, current_user, data)
+
+
+@router.post("/coach/intake/generate-plan", response_model=AiTrainingPlanRead, status_code=status.HTTP_201_CREATED)
+def generate_plan_from_coach_intake(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    try:
+        return ai_coach_intake_service.generate_plan(db, current_user)
+    except AiCoachIntakeCannotGenerateError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/coach/intake/reset", response_model=AiCoachIntakeRead)
+def reset_coach_intake(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return ai_coach_intake_service.reset_intake(db, current_user)
 
 
 @router.post("/suggestions/{suggestion_id}/accept", response_model=AiSuggestionRead)

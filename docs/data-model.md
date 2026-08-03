@@ -92,6 +92,15 @@
 - `plan_payload` guarda la propuesta estructurada y, al aceptar, los ids de rutinas creadas.
 - Modificar un plan en borrador crea otro `AiTrainingPlan` en estado `draft`; el origen y la instruccion se guardan en `input_summary.modified_from_plan_id` y `input_summary.modification_instruction`.
 
+### AiCoachIntake
+
+- Campos: `id`, `user_id`, `status`, `intake_summary`, `recent_messages`, `missing_required_fields`, `ready_for_plan`, `sensitive_data_acknowledged`, `created_at`, `updated_at`.
+- Hay un unico intake activo por usuario.
+- Estados: `collecting`, `ready`, `plan_generated`.
+- `intake_summary` guarda objetivo, nivel, dias por semana, duracion, equipamiento, prioridades y limitaciones solo con confirmacion.
+- `recent_messages` guarda solo los ultimos mensajes necesarios para continuar la entrevista; no es historial completo.
+- No crea rutinas, sesiones ni series. Solo permite generar un `AiTrainingPlan` borrador cuando faltantes obligatorios esta vacio.
+
 ### AiSessionSummary
 
 - Campos: `id`, `user_id`, `session_id`, `summary`, `improvements`, `drops`, `warnings`, `next_recommendation`, `input_summary`, `provider`, `model`, `fallback_used`, `created_at`.
@@ -110,6 +119,7 @@
 - Una sesion puede apuntar a una rutina borrada logicamente; la historia no se elimina.
 - Una sugerencia IA puede apuntar a un ejercicio planificado y se aplica solo si la rutina sigue activa y pertenece al usuario.
 - Un plan IA pertenece a un usuario; al aceptarlo crea rutinas privadas de ese usuario. Una version modificada referencia el plan origen en `input_summary`.
+- Un intake de Coach pertenece a un usuario y puede crear un plan IA borrador si esta listo; no crea rutinas por si solo.
 - Un resumen IA pertenece a una sesion del usuario; sesiones borradas o ajenas no se resumen ni se leen.
 
 ## Estadisticas Calculadas
@@ -141,4 +151,5 @@
 - Soft delete oculta rutinas/sesiones segun reglas del MVP.
 - Sugerencias IA guardan trazabilidad, no usan `notes`, no mezclan unidades, validan ejercicios alternativos accesibles y no modifican sesiones historicas.
 - Planes IA requieren confirmacion explicita para limitaciones fisicas o modificaciones sensibles, no sustituyen consejo medico/profesional y solo crean rutinas al aceptar.
+- Intake conversacional no genera planes sin objetivo, nivel, dias por semana y duracion; redacta mensajes sensibles no confirmados.
 - Resumenes post-sesion IA no usan notas, no mezclan unidades, no modifican datos historicos y respetan ownership de sesiones.

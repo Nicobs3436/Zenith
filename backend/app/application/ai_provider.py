@@ -120,6 +120,31 @@ class AiCoachQuestionProviderResult:
     fallback_used: bool = False
 
 
+@dataclass(frozen=True)
+class AiCoachIntakeProviderContext:
+    intake_summary: dict[str, Any]
+    recent_messages: list[dict[str, Any]]
+    user_message: str | None
+    missing_required_fields: list[str]
+    useful_missing_fields: list[str]
+    sensitive_data_acknowledged: bool
+
+
+@dataclass(frozen=True)
+class AiCoachIntakeProviderResult:
+    assistant_message: str
+    extracted_fields: dict[str, Any]
+    missing_required_fields: list[str]
+    useful_missing_fields: list[str]
+    estimated_fields: list[str]
+    ready_for_plan: bool
+    safety_warning: str | None
+    provider: str
+    model: str | None
+    external_data_sent: bool
+    fallback_used: bool = False
+
+
 class InternalAiProvider:
     provider = "internal"
     model = "rules"
@@ -168,12 +193,45 @@ class InternalAiProvider:
             external_data_sent=self.external_data_sent,
         )
 
+    def build_coach_intake_response(self, context: AiCoachIntakeProviderContext) -> AiCoachIntakeProviderResult:
+        missing = context.missing_required_fields
+        useful = context.useful_missing_fields
+        if missing:
+            next_field = missing[0]
+            question = {
+                "goal": "Para ajustar el plan, dime tu objetivo principal: fuerza, hipertrofia, perdida de grasa, salud general o resistencia.",
+                "level": "Cual es tu nivel actual: principiante, intermedio o avanzado?",
+                "days_per_week": "Cuantos dias por semana puedes entrenar de forma realista?",
+                "session_duration_minutes": "Cuantos minutos tienes por sesion?",
+            }.get(next_field, "Dame un poco mas de contexto para completar tu plan.")
+        elif useful:
+            question = "Ya tengo lo imprescindible. Si quieres afinarlo, dime equipamiento disponible, prioridades musculares o limitaciones fisicas. Si no, puedo generar el plan."
+        else:
+            question = "Tengo suficiente informacion para crear un borrador de plan. Revisalo antes de aceptarlo."
+        return AiCoachIntakeProviderResult(
+            assistant_message=question,
+            extracted_fields={},
+            missing_required_fields=missing,
+            useful_missing_fields=useful,
+            estimated_fields=[],
+            ready_for_plan=not missing,
+            safety_warning=self._intake_safety_warning(context.sensitive_data_acknowledged),
+            provider=self.provider,
+            model=self.model,
+            external_data_sent=self.external_data_sent,
+        )
+
     def _confidence_for(self, suggestion_type: str) -> str:
         if suggestion_type in {"increase_weight", "increase_rest"}:
             return "high"
         if suggestion_type in {"reduce_volume", "change_reps", "deload_recommended", "exercise_swap", "routine_goal_adjustment"}:
             return "medium"
         return "low"
+
+    def _intake_safety_warning(self, sensitive_data_acknowledged: bool) -> str | None:
+        if sensitive_data_acknowledged:
+            return "Las limitaciones indicadas sirven solo para adaptar el plan; no sustituyen consejo medico o profesional."
+        return None
 
 
 class OllamaAiProvider:
@@ -320,6 +378,33 @@ class OllamaAiProvider:
 
         return self._parse_coach_question_response(model_response)
 
+    def build_coach_intake_response(self, context: AiCoachIntakeProviderContext) -> AiCoachIntakeProviderResult:
+        payload = {
+            "model": self.model,
+            "stream": False,
+            "format": "json",
+            "prompt": self._coach_intake_prompt(context),
+        }
+        request = Request(
+            f"{self.base_url}/api/generate",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.timeout_seconds) as response:
+                raw = response.read().decode("utf-8")
+        except (OSError, URLError) as error:
+            raise AiProviderError("Ollama request failed.") from error
+
+        try:
+            parsed = json.loads(raw)
+            model_response = json.loads(parsed.get("response", ""))
+        except (TypeError, ValueError) as error:
+            raise AiProviderError("Ollama returned invalid JSON.") from error
+
+        return self._parse_coach_intake_response(model_response)
+
     def _prompt(self, context: AiProviderContext) -> str:
         safe_context = {
             "suggestion_type": context.suggestion_type,
@@ -426,6 +511,30 @@ class OllamaAiProvider:
             f"{json.dumps(safe_context, ensure_ascii=False)}"
         )
 
+    def _coach_intake_prompt(self, context: AiCoachIntakeProviderContext) -> str:
+        safe_context = {
+            "intake_summary": context.intake_summary,
+            "recent_messages": context.recent_messages[-4:],
+            "latest_user_message": context.user_message,
+            "missing_required_fields": context.missing_required_fields,
+            "useful_missing_fields": context.useful_missing_fields,
+            "sensitive_data_acknowledged": context.sensitive_data_acknowledged,
+        }
+        return (
+            "Eres el entrenador personal de Zenith. Haz una entrevista inicial por bloques manejables. "
+            "No generes un plan todavia: solo recopila datos, resume campos y pregunta lo siguiente. "
+            "No inventes fuentes, diagnosticos, datos personales ni promesas absolutas. "
+            "Si faltan campos obligatorios, pregunta solo por el mas importante. "
+            "Si hay datos suficientes, marca ready_for_plan=true e invita a generar un borrador revisable. "
+            "Devuelve solo JSON valido con keys: assistant_message, extracted_fields, missing_required_fields, "
+            "useful_missing_fields, estimated_fields, ready_for_plan, safety_warning. "
+            "extracted_fields solo puede incluir: goal, level, days_per_week, session_duration_minutes, "
+            "available_equipment, priorities, physical_limitations. goal debe ser strength, hypertrophy, fat_loss, "
+            "general_health o endurance. level debe ser beginner, intermediate o advanced. "
+            "No incluyas physical_limitations si sensitive_data_acknowledged=false. Contexto estructurado: "
+            f"{json.dumps(safe_context, ensure_ascii=False)}"
+        )
+
     def _parse_model_response(self, data: Any) -> AiProviderResult:
         if not isinstance(data, dict):
             raise AiProviderError("Ollama response is not an object.")
@@ -505,6 +614,25 @@ class OllamaAiProvider:
             answer=self._text(data.get("answer")) or "",
             key_points=self._string_list(data.get("key_points")),
             suggested_actions=self._string_list(data.get("suggested_actions")),
+            provider=self.provider,
+            model=self.model,
+            external_data_sent=self.external_data_sent,
+        )
+
+    def _parse_coach_intake_response(self, data: Any) -> AiCoachIntakeProviderResult:
+        if not isinstance(data, dict):
+            raise AiProviderError("Ollama response is not an object.")
+        extracted_fields = data.get("extracted_fields")
+        if not isinstance(extracted_fields, dict):
+            raise AiProviderError("Ollama extracted fields are invalid.")
+        return AiCoachIntakeProviderResult(
+            assistant_message=self._text(data.get("assistant_message")) or "",
+            extracted_fields=extracted_fields,
+            missing_required_fields=self._string_list(data.get("missing_required_fields")),
+            useful_missing_fields=self._string_list(data.get("useful_missing_fields")),
+            estimated_fields=self._string_list(data.get("estimated_fields")),
+            ready_for_plan=bool(data.get("ready_for_plan")),
+            safety_warning=self._text(data.get("safety_warning"), required=False),
             provider=self.provider,
             model=self.model,
             external_data_sent=self.external_data_sent,
@@ -614,6 +742,30 @@ def enrich_coach_question_with_provider(
             answer=fallback.answer,
             key_points=fallback.key_points,
             suggested_actions=fallback.suggested_actions,
+            provider=getattr(provider, "provider", "unknown"),
+            model=getattr(provider, "model", None),
+            external_data_sent=getattr(provider, "external_data_sent", False),
+            fallback_used=True,
+        )
+
+
+def enrich_coach_intake_with_provider(
+    context: AiCoachIntakeProviderContext, settings: Settings | None = None
+) -> AiCoachIntakeProviderResult:
+    internal = InternalAiProvider()
+    provider = build_ai_provider(settings)
+    try:
+        return provider.build_coach_intake_response(context)
+    except AiProviderError:
+        fallback = internal.build_coach_intake_response(context)
+        return AiCoachIntakeProviderResult(
+            assistant_message=fallback.assistant_message,
+            extracted_fields=fallback.extracted_fields,
+            missing_required_fields=fallback.missing_required_fields,
+            useful_missing_fields=fallback.useful_missing_fields,
+            estimated_fields=fallback.estimated_fields,
+            ready_for_plan=fallback.ready_for_plan,
+            safety_warning=fallback.safety_warning,
             provider=getattr(provider, "provider", "unknown"),
             model=getattr(provider, "model", None),
             external_data_sent=getattr(provider, "external_data_sent", False),

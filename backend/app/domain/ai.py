@@ -72,6 +72,7 @@ class AiCoachQuestionRead(BaseModel):
 TrainingPlanGoal = Literal["strength", "hypertrophy", "fat_loss", "general_health", "endurance"]
 TrainingPlanLevel = Literal["beginner", "intermediate", "advanced"]
 TrainingPlanStatus = Literal["draft", "accepted", "rejected"]
+AiCoachIntakeStatus = Literal["collecting", "ready", "plan_generated"]
 
 
 class AiTrainingPlanGenerateRequest(BaseModel):
@@ -128,6 +129,36 @@ class AiTrainingPlanRead(BaseModel):
     fallback_used: bool
     created_at: datetime
     reviewed_at: datetime | None
+
+
+class AiCoachIntakeMessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1_000)
+    sensitive_data_acknowledged: bool = False
+
+    @model_validator(mode="after")
+    def normalize_message(self) -> "AiCoachIntakeMessageRequest":
+        self.message = self.message.strip()
+        return self
+
+
+class AiCoachIntakeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    status: AiCoachIntakeStatus
+    intake_summary: dict[str, Any]
+    recent_messages: list[dict[str, Any]]
+    missing_required_fields: list[str]
+    useful_missing_fields: list[str] = Field(default_factory=list)
+    ready_for_plan: bool
+    sensitive_data_acknowledged: bool
+    assistant_message: str | None = None
+    safety_warning: str | None = None
+    provider: str = "internal"
+    model: str | None = None
+    fallback_used: bool = False
+    updated_at: datetime
 
 
 class AiSessionSummaryRead(BaseModel):

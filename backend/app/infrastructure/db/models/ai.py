@@ -74,3 +74,19 @@ class AiSessionSummary(Base):
     model: Mapped[str | None] = mapped_column(String(80))
     fallback_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class AiCoachIntake(Base):
+    __tablename__ = "ai_coach_intakes"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_ai_coach_intakes_user_id"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="collecting", index=True)
+    intake_summary: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    recent_messages: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    missing_required_fields: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    ready_for_plan: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sensitive_data_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

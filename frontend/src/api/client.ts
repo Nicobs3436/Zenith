@@ -151,6 +151,34 @@ export type AiCoachQuestionResponse = {
   input_summary: Record<string, unknown>;
 };
 
+export type AiCoachIntakeMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export type AiCoachIntake = {
+  id: string;
+  user_id: string;
+  status: 'collecting' | 'ready' | 'plan_generated';
+  intake_summary: Record<string, unknown>;
+  recent_messages: AiCoachIntakeMessage[];
+  missing_required_fields: string[];
+  useful_missing_fields: string[];
+  ready_for_plan: boolean;
+  sensitive_data_acknowledged: boolean;
+  assistant_message: string | null;
+  safety_warning: string | null;
+  provider: string;
+  model: string | null;
+  fallback_used: boolean;
+  updated_at: string;
+};
+
+export type AiCoachIntakeMessageRequest = {
+  message: string;
+  sensitive_data_acknowledged: boolean;
+};
+
 export type TrainingPlanGoal = 'strength' | 'hypertrophy' | 'fat_loss' | 'general_health' | 'endurance';
 export type TrainingPlanLevel = 'beginner' | 'intermediate' | 'advanced';
 export type TrainingPlanStatus = 'draft' | 'accepted' | 'rejected';
@@ -735,6 +763,22 @@ export function analyzeRoutineGoal(routineId: string) {
 
 export function askCoachQuestion(payload: AiCoachQuestionRequest) {
   return request<AiCoachQuestionResponse>('/ai/coach/questions', { method: 'POST', auth: true, body: payload });
+}
+
+export function getCoachIntake() {
+  return request<AiCoachIntake>('/ai/coach/intake', { auth: true });
+}
+
+export function sendCoachIntakeMessage(payload: AiCoachIntakeMessageRequest) {
+  return request<AiCoachIntake>('/ai/coach/intake/messages', { method: 'POST', auth: true, body: payload });
+}
+
+export function generateTrainingPlanFromCoachIntake() {
+  return request<AiTrainingPlan>('/ai/coach/intake/generate-plan', { method: 'POST', auth: true });
+}
+
+export function resetCoachIntake() {
+  return request<AiCoachIntake>('/ai/coach/intake/reset', { method: 'POST', auth: true });
 }
 
 export function generateTrainingPlan(payload: AiTrainingPlanGenerateRequest) {
