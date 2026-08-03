@@ -51,3 +51,23 @@ def test_settings_require_ai_external_data_flag_for_non_internal_provider_in_pro
 
     with pytest.raises(ValueError, match="APP_AI_EXTERNAL_DATA_ENABLED"):
         Settings()
+
+
+def test_settings_accept_groq_with_api_key_and_external_data_enabled_in_staging(monkeypatch) -> None:
+    monkeypatch.setenv("APP_ENVIRONMENT", "staging")
+    monkeypatch.setenv("APP_SECRET_KEY", "production-secret-key")
+    monkeypatch.setenv("APP_AI_PROVIDER", "groq")
+    monkeypatch.setenv("APP_AI_GROQ_API_KEY", "test-groq-key")
+    monkeypatch.setenv("APP_AI_EXTERNAL_DATA_ENABLED", "true")
+
+    settings = Settings()
+
+    assert settings.ai_provider == "groq"
+    assert settings.ai_groq_api_key == "test-groq-key"
+
+
+def test_settings_require_groq_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("APP_AI_PROVIDER", "groq")
+
+    with pytest.raises(ValueError, match="APP_AI_GROQ_API_KEY"):
+        Settings()

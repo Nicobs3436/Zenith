@@ -464,7 +464,7 @@ class OllamaAiProvider:
             "Devuelve SOLO JSON valido. No diagnostiques, no prometas resultados absolutos y no incluyas datos personales no aportados. "
             "El JSON debe ser plan_payload v3 y tener keys: version, generated_by, program_blueprint, coach_rationale, exercise_resolution, "
             "weekly_schedule, volume_by_muscle, progression_model, routines, validation_report, acceptance_effects, explanation, risk_notes, confidence. "
-            "version debe ser 3. generated_by.provider debe ser ollama. confidence debe ser low, medium o high. "
+            f"version debe ser 3. generated_by.provider debe ser {self.provider}. confidence debe ser low, medium o high. "
             "Primero disena la arquitectura del programa: split, volumen semanal por musculo, roles por dia y progresion. Luego elige ejercicios. "
             "No uses ejercicios que el usuario pidio evitar en priorities con formato 'evitar ...'. "
             "routines debe tener exactamente days_per_week elementos. Cada routine debe tener: day, name, focus, description, target_duration_minutes, session_role, exercises. "
@@ -676,8 +676,68 @@ class OllamaAiProvider:
         return cleaned
 
 
+class GroqAiProvider(OllamaAiProvider):
+    provider = "groq"
+    external_data_sent = True
+
+    def __init__(self, settings: Settings) -> None:
+        self.base_url = settings.ai_groq_base_url.rstrip("/")
+        self.model = settings.ai_groq_model
+        self.api_key = settings.ai_groq_api_key or ""
+        self.timeout_seconds = settings.ai_timeout_seconds
+
+    def build_explanation(self, context: AiProviderContext) -> AiProviderResult:
+        return self._parse_model_response(self._chat_json(self._prompt(context)))
+
+    def build_training_plan_text(self, context: AiTrainingPlanProviderContext) -> AiTrainingPlanProviderResult:
+        return self._parse_training_plan_response(self._chat_json(self._training_plan_prompt(context)))
+
+    def build_training_plan_structure(self, context: AiTrainingPlanProviderContext) -> AiTrainingPlanStructureProviderResult:
+        return self._parse_training_plan_structure_response(self._chat_json(self._training_plan_structure_prompt(context)))
+
+    def build_session_summary_text(self, context: AiSessionSummaryProviderContext) -> AiSessionSummaryProviderResult:
+        return self._parse_session_summary_response(self._chat_json(self._session_summary_prompt(context)))
+
+    def build_coach_question_text(self, context: AiCoachQuestionProviderContext) -> AiCoachQuestionProviderResult:
+        return self._parse_coach_question_response(self._chat_json(self._coach_question_prompt(context)))
+
+    def build_coach_intake_response(self, context: AiCoachIntakeProviderContext) -> AiCoachIntakeProviderResult:
+        return self._parse_coach_intake_response(self._chat_json(self._coach_intake_prompt(context)))
+
+    def _chat_json(self, prompt: str) -> Any:
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": "Devuelve solo JSON valido, sin markdown."},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.4,
+        }
+        request = Request(
+            f"{self.base_url}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.timeout_seconds) as response:
+                raw = response.read().decode("utf-8")
+        except (OSError, URLError) as error:
+            raise AiProviderError("Groq request failed.") from error
+
+        try:
+            parsed = json.loads(raw)
+            content = parsed["choices"][0]["message"]["content"]
+            return json.loads(content)
+        except (KeyError, IndexError, TypeError, ValueError) as error:
+            raise AiProviderError("Groq returned invalid JSON.") from error
+
+
 def build_ai_provider(settings: Settings | None = None):
     settings = settings or get_settings()
+    if settings.ai_provider == "groq":
+        return GroqAiProvider(settings)
     if settings.ai_provider == "ollama":
         return OllamaAiProvider(settings)
     return InternalAiProvider()

@@ -67,7 +67,7 @@ Fase 20 prepara deploy con coste 0:
 - DB: Neon Free PostgreSQL.
 - Frontend web/PWA: Vercel Free usando `frontend/vercel.json`.
 - CI: GitHub Actions en `.github/workflows/ci.yml`.
-- IA en staging/produccion: `APP_AI_PROVIDER=internal`.
+- IA en staging/produccion: `APP_AI_PROVIDER=groq` para Coach V3 con `APP_AI_EXTERNAL_DATA_ENABLED=true`.
 
 Ver `docs/deploy.md` para variables, migraciones, seeds, rollback y limitaciones del free tier.
 

@@ -8,7 +8,7 @@ Desplegar Zenith con coste 0 para staging/beta inicial:
 - Base de datos: Neon Free PostgreSQL.
 - Frontend web/PWA: Vercel Free.
 - CI: GitHub Actions Free.
-- IA en staging/produccion: `internal`.
+- IA en staging/produccion: `groq` para Coach V3 con plan revisable; `internal` queda como fallback local/desarrollo.
 
 No se incluye publicacion en App Store o Google Play porque no es coste 0.
 
@@ -36,8 +36,10 @@ Variables Render:
 - `APP_DATABASE_URL=<neon-postgres-url>`.
 - `APP_SECRET_KEY=<secret-largo-unico>`.
 - `APP_CORS_ORIGINS=https://<vercel-project>.vercel.app`.
-- `APP_AI_PROVIDER=internal`.
-- `APP_AI_EXTERNAL_DATA_ENABLED=false`.
+- `APP_AI_PROVIDER=groq`.
+- `APP_AI_GROQ_API_KEY=<groq-api-key>`.
+- `APP_AI_GROQ_MODEL=llama-3.3-70b-versatile`.
+- `APP_AI_EXTERNAL_DATA_ENABLED=true`.
 
 Notas:
 
@@ -130,7 +132,7 @@ En free tier, revisar limites de Neon. Antes de cambios importantes:
 - Render Free puede dormir y tener cold starts.
 - Neon Free tiene limites de almacenamiento/compute.
 - Vercel Free es adecuado para web/PWA inicial.
-- Ollama no se despliega gratis de forma estable; mantener `APP_AI_PROVIDER=internal`.
+- Ollama no se despliega gratis de forma estable en Render Free; para Coach V3 publico usar `APP_AI_PROVIDER=groq` y guardar `APP_AI_GROQ_API_KEY` como secreto.
 - Publicar apps nativas en tiendas no entra en presupuesto 0.
 
 ## Antes De Producto

@@ -280,6 +280,60 @@ def test_ollama_provider_generates_training_plan_structure(
     assert "owner@example.com" not in captured_body["body"]
 
 
+def test_groq_provider_generates_training_plan_structure(
+    client_with_db: tuple[TestClient, SessionFactory], monkeypatch
+) -> None:
+    response_body = b""
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, _exc_type, _exc, _traceback):
+            return False
+
+        def read(self):
+            return response_body
+
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["body"] = request.data.decode("utf-8")
+        captured["authorization"] = request.get_header("Authorization")
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setenv("APP_AI_PROVIDER", "groq")
+    monkeypatch.setenv("APP_AI_GROQ_API_KEY", "test-groq-key")
+    monkeypatch.setenv("APP_AI_GROQ_MODEL", "llama-3.3-70b-versatile")
+    get_settings.cache_clear()
+    monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
+    client, session_factory = client_with_db
+    exercises = seed_exercises(session_factory)
+    groq_content = json.loads(ollama_plan_response(exercises, explanation="Plan estructurado por Groq").decode("utf-8"))["response"]
+    response_body = json.dumps({"choices": [{"message": {"content": groq_content}}]}).encode("utf-8")
+    token = register_and_login(client, "groq-owner@example.com", "groq_owner")
+
+    response = client.post(
+        "/ai/training-plans/generate",
+        headers={"Authorization": f"Bearer {token}"},
+        json=plan_payload(days_per_week=3),
+    )
+
+    get_settings.cache_clear()
+    assert response.status_code == 201
+    data = response.json()
+    assert data["explanation"] == "Plan estructurado por Groq"
+    assert data["provider"] == "groq"
+    assert data["model"] == "llama-3.3-70b-versatile"
+    assert data["input_summary"]["ai_provider"]["external_data_sent"] is True
+    assert captured["url"] == "https://api.groq.com/openai/v1/chat/completions"
+    assert captured["authorization"] == "Bearer test-groq-key"
+    assert "response_format" in captured["body"]
+    assert "groq-owner@example.com" not in captured["body"]
+
+
 def test_ollama_provider_falls_back_for_training_plan_on_invalid_response(
     client_with_db: tuple[TestClient, SessionFactory], monkeypatch
 ) -> None:

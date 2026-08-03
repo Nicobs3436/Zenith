@@ -17,6 +17,10 @@ services:
       - key: APP_CORS_ORIGINS
         sync: false
       - key: APP_AI_PROVIDER
-        value: internal
+        value: groq
       - key: APP_AI_EXTERNAL_DATA_ENABLED
-        value: "false"
+        value: "true"
+      - key: APP_AI_GROQ_API_KEY
+        sync: false
+      - key: APP_AI_GROQ_MODEL
+        value: llama-3.3-70b-versatile

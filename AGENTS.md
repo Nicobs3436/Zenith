@@ -30,7 +30,7 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - Tests frontend actuales cubren helpers de formularios, progresion, formato stats/rank, mensajes auth y cliente API; tests de pantallas todavia no configurados.
 - Frontend persiste access y refresh token con `expo-secure-store`; fallback web actual usa `localStorage`.
 - Pendiente backend: lint, format, typecheck y build todavia no estan configurados.
-- Deploy fase 20: coste 0 con Render Free para backend Docker, Neon Free para PostgreSQL, Vercel Free para web/PWA, GitHub Actions Free para CI e IA `internal` en staging/produccion.
+- Deploy fase 20: coste 0 con Render Free para backend Docker, Neon Free para PostgreSQL, Vercel Free para web/PWA, GitHub Actions Free para CI e IA `groq` en staging/produccion para Coach V3 con clave en secreto.
 - Producto fase 21: beta gratuita Zenith con branding, privacidad/terminos estaticos, aviso medico visible y aceptacion antes de registro; eliminacion/exportacion automatica queda pendiente.
 
 ## Estructura del proyecto

@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 DEFAULT_SECRET_KEY = "local-development-secret-key-change-me"
 SECURE_ENVIRONMENTS = {"staging", "prod", "production"}
-AI_PROVIDERS = {"internal", "ollama"}
+AI_PROVIDERS = {"internal", "ollama", "groq"}
 
 
 class Settings(BaseSettings):
@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     ai_provider: str = "internal"
     ai_ollama_base_url: str = "http://localhost:11434"
     ai_ollama_model: str = "llama3.2"
+    ai_groq_api_key: str | None = None
+    ai_groq_base_url: str = "https://api.groq.com/openai/v1"
+    ai_groq_model: str = "llama-3.3-70b-versatile"
     ai_timeout_seconds: int = 20
     ai_external_data_enabled: bool = False
     cors_origins: Annotated[list[str], NoDecode] = [
@@ -51,7 +54,9 @@ class Settings(BaseSettings):
         if self.environment.strip().lower() in SECURE_ENVIRONMENTS and self.secret_key == DEFAULT_SECRET_KEY:
             raise ValueError("APP_SECRET_KEY must be changed outside local development.")
         if self.ai_provider not in AI_PROVIDERS:
-            raise ValueError("APP_AI_PROVIDER must be internal or ollama.")
+            raise ValueError("APP_AI_PROVIDER must be internal, ollama or groq.")
+        if self.ai_provider == "groq" and not (self.ai_groq_api_key or "").strip():
+            raise ValueError("APP_AI_GROQ_API_KEY is required when APP_AI_PROVIDER=groq.")
         if (
             self.environment.strip().lower() in SECURE_ENVIRONMENTS
             and self.ai_provider != "internal"

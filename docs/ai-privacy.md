@@ -2,12 +2,14 @@
 
 ## Decision Actual
 
-- Fase implementada: Coach V2 conversacional continuo con proveedor interno, mas proveedor opcional Ollama local para sugerencias, planes, resumenes y preguntas guiadas legacy.
-- Proveedor por defecto: reglas locales dentro del backend.
-- Proveedor opcional: Ollama local configurado con `APP_AI_PROVIDER=ollama`.
+- Fase implementada: Coach V2 conversacional continuo con Coach V3 para planes IA revisables.
+- Proveedor por defecto local: reglas locales dentro del backend.
+- Proveedor publico para Coach V3: Groq configurado con `APP_AI_PROVIDER=groq` y `APP_AI_EXTERNAL_DATA_ENABLED=true`.
+- Proveedor opcional local: Ollama configurado con `APP_AI_PROVIDER=ollama`.
 - Modelo por defecto Ollama: `llama3.2`.
-- Coste: 0 si se usa proveedor interno u Ollama local.
-- Datos enviados fuera del sistema: ninguno con proveedor interno; con Ollama local los datos estructurados se envian solo al servidor local configurado.
+- Modelo por defecto Groq: `llama-3.3-70b-versatile`.
+- Coste: 0 con proveedor interno, Ollama local o cuota gratuita de Groq mientras sus limites lo permitan.
+- Datos enviados fuera del sistema: ninguno con proveedor interno; con Ollama local los datos estructurados se envian solo al servidor local configurado; con Groq se envia contexto estructurado minimo al API remoto de Groq.
 - `notes` de rutinas, sesiones y series quedan excluidas del contexto usado por IA.
 - Email, username, password hash y tokens no se usan como contexto.
 
@@ -17,7 +19,8 @@
 - Objetivos estructurados: series, reps, peso/unidad, RPE/RIR y descanso.
 - Sesiones activas no borradas.
 - Series estructuradas: reps, peso/unidad, RPE/RIR y descanso.
-- Para planes adaptativos: objetivo, nivel, dias disponibles, duracion, equipamiento disponible, prioridades, catalogo estructurado de ejercicios accesibles y limitaciones fisicas si el usuario las confirma explicitamente.
+- Para planes adaptativos legacy: objetivo, nivel, dias disponibles, duracion, equipamiento disponible, prioridades, catalogo estructurado de ejercicios accesibles y limitaciones fisicas si el usuario las confirma explicitamente.
+- Para Coach V3: objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion, equipamiento, prioridades, ejercicios evitados y limitaciones fisicas solo si el usuario las confirma; la IA puede proponer ejercicios fuera del catalogo y el backend los crea como privados solo al aceptar.
 - Para entrevista conversacional del Coach: resumen estructurado de objetivo, nivel, dias, duracion, equipamiento, prioridades y limitaciones solo con confirmacion; se guardan solo los ultimos mensajes necesarios, no el historial completo.
 - Para Coach V2: perfil estructurado con objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion, equipamiento, prioridades, ejercicios evitados y limitaciones solo con aviso confirmado. Se guarda memoria resumida, propuestas y ultimos mensajes necesarios, no historial completo.
 - Para modificar planes adaptativos: la instruccion libre del usuario, el resumen estructurado del plan original y los mismos campos de planificacion; no se usan notas, email, username ni tokens.
@@ -54,8 +57,9 @@ Cada sugerencia guarda:
 - Rechazar un plan no modifica rutinas ni sesiones.
 - Modificar un plan adaptativo en borrador crea una nueva version `draft`; no sobrescribe el plan original ni crea rutinas.
 - La nueva version guarda `modified_from_plan_id` y `modification_instruction` en `input_summary` para trazabilidad.
-- En planes adaptativos, Ollama puede proponer la estructura completa del plan: dias, ejercicios del catalogo accesible, series, repeticiones, RPE/RIR, descansos, explicacion y progresion.
-- El backend valida el `plan_payload` completo antes de persistirlo, exige ejercicios accesibles y rangos seguros, rechaza planes redundantes o con volumen incoherente y reintenta una reparacion antes de usar fallback interno.
+- En planes adaptativos legacy, Ollama o Groq pueden proponer la estructura completa del plan: dias, ejercicios, series, repeticiones, RPE/RIR, descansos, explicacion y progresion.
+- En Coach V3, Groq u Ollama generan `plan_payload` version 3 con blueprint, volumen semanal, progresion, rutinas, razones por ejercicio y efectos al aceptar. No hay fallback interno para Coach V3.
+- El backend valida el `plan_payload` completo antes de persistirlo, exige rangos seguros, rechaza planes redundantes o con volumen incoherente y reintenta una reparacion con el proveedor configurado. Los ejercicios inexistentes quedan pendientes y se crean como privados del usuario solo al aceptar.
 - La entrevista conversacional `POST /ai/coach/intake/messages` persiste un unico intake activo por usuario con resumen estructurado, ultimos mensajes, campos faltantes y estado `ready_for_plan`; no crea rutinas ni sesiones.
 - `POST /ai/coach/intake/generate-plan` solo genera un plan borrador si el intake contiene objetivo, nivel, dias por semana y duracion; reutiliza la validacion estricta de planes adaptativos.
 - `POST /ai/coach/v2/generate-plan` solo genera un plan borrador si el perfil contiene los datos obligatorios. El plan sigue siendo revisable y solo crea rutinas reales al aceptar.
@@ -102,9 +106,19 @@ Cada sugerencia guarda:
 - Para resumenes post-sesion, el prompt no incluye notas de sesion/series, email, username, tokens ni credenciales.
 - Para preguntas guiadas, el prompt no incluye notas, email, username, tokens, credenciales ni texto libre de `detail`; solo contexto estructurado y metricas.
 
+## Groq Remoto
+
+- Configura `APP_AI_PROVIDER=groq`, `APP_AI_GROQ_API_KEY`, `APP_AI_GROQ_MODEL` y `APP_AI_EXTERNAL_DATA_ENABLED=true`.
+- Endpoint usado: `POST /openai/v1/chat/completions` con `response_format={"type":"json_object"}`.
+- No se anade SDK obligatorio; el backend usa HTTP de la libreria estandar.
+- La clave de Groq se guarda solo como variable de entorno/secreto del despliegue y no se versiona.
+- El prompt no incluye email, username, password hash, tokens, credenciales ni notas privadas.
+- Para Coach V3 se envia el perfil estructurado minimo necesario para crear el plan y limitaciones fisicas solo si `sensitive_data_acknowledged=true`.
+- Las respuestas de Groq se validan antes de guardarse; si no pasan validacion tras reparacion, no se crea plan.
+
 ## Futuras Integraciones
 
-Antes de usar un proveedor remoto distinto de Ollama local hay que decidir explicitamente:
+Antes de usar otro proveedor remoto distinto de Groq hay que decidir explicitamente:
 
 - proveedor.
 - coste esperado.

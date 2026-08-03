@@ -95,6 +95,14 @@ def ollama_v3_plan_response(*, days: int = 3, include_avoided: bool = False) -> 
     return json.dumps({"response": json.dumps(payload)}).encode("utf-8")
 
 
+def groq_v3_plan_response(*, days: int = 3) -> bytes:
+    ollama_response = json.loads(ollama_v3_plan_response(days=days).decode("utf-8"))
+    payload = json.loads(ollama_response["response"])
+    payload["generated_by"] = {"provider": "groq", "model": "llama-3.3-70b-versatile", "mode": "ai_personal_trainer", "backend_validated": False}
+    payload["explanation"] = "Plan V3 creado por Groq."
+    return json.dumps({"choices": [{"message": {"content": json.dumps(payload)}}]}).encode("utf-8")
+
+
 class FakeOllamaResponse:
     def __init__(self, body: bytes) -> None:
         self.body = body
@@ -112,6 +120,14 @@ class FakeOllamaResponse:
 def use_fake_ollama(monkeypatch, body: bytes) -> None:
     monkeypatch.setenv("APP_AI_PROVIDER", "ollama")
     monkeypatch.setenv("APP_AI_OLLAMA_MODEL", "llama3.2")
+    get_settings.cache_clear()
+    monkeypatch.setattr("app.application.ai_provider.urlopen", lambda _request, timeout: FakeOllamaResponse(body))
+
+
+def use_fake_groq(monkeypatch, body: bytes) -> None:
+    monkeypatch.setenv("APP_AI_PROVIDER", "groq")
+    monkeypatch.setenv("APP_AI_GROQ_API_KEY", "test-groq-key")
+    monkeypatch.setenv("APP_AI_GROQ_MODEL", "llama-3.3-70b-versatile")
     get_settings.cache_clear()
     monkeypatch.setattr("app.application.ai_provider.urlopen", lambda _request, timeout: FakeOllamaResponse(body))
 
@@ -239,6 +255,33 @@ def test_coach_v2_requires_ollama_for_v3_generation(client_with_db: tuple[TestCl
 
     assert response.status_code == 422
     assert "ollama" in response.json()["detail"].lower()
+
+
+def test_coach_v2_generates_v3_plan_with_groq(client_with_db: tuple[TestClient, SessionFactory], monkeypatch) -> None:
+    use_fake_groq(monkeypatch, groq_v3_plan_response(days=3))
+    client, session_factory = client_with_db
+    seed_exercises(session_factory, count=8)
+    token = register_and_login(client, "coach-v2-groq@example.com", "coach_v2_groq")
+
+    client.post(
+        "/ai/coach/v2/messages",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "message": "acepto, objetivo hipertrofia, femenino, 31 anos, 165 cm, 62 kg, intermedio, 3 dias, 60 minutos, gimnasio comercial",
+            "personal_data_acknowledged": True,
+            "sensitive_data_acknowledged": False,
+        },
+    )
+    response = client.post("/ai/coach/v2/generate-plan", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 201
+    plan = response.json()
+    assert plan["provider"] == "groq"
+    assert plan["input_summary"]["ai_provider"]["external_data_sent"] is True
+    assert plan["plan_payload"]["version"] == 3
+    assert plan["plan_payload"]["generated_by"]["provider"] == "groq"
+    assert plan["plan_payload"]["generated_by"]["backend_validated"] is True
+    get_settings.cache_clear()
 
 
 def test_coach_v2_accepts_v3_plan_and_creates_pending_exercises_as_private(
