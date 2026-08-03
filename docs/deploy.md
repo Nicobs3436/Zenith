@@ -43,7 +43,7 @@ Notas:
 
 - `APP_SECRET_KEY` no puede usar el valor local en `staging` ni `production`.
 - Render Free puede dormir por inactividad; la primera request puede tardar mas.
-- Render no ejecuta migraciones automaticamente con esta configuracion. Ejecutarlas manualmente desde entorno local o desde una shell/job temporal apuntando a Neon.
+- Render ejecuta `alembic upgrade head` al arrancar el contenedor antes de iniciar Uvicorn. En cambios criticos, revisar logs de Render tras el deploy.
 
 ## Base De Datos Neon Free
 
@@ -59,7 +59,7 @@ postgresql+psycopg://USER:PASSWORD@HOST/DBNAME?sslmode=require
 
 ## Migraciones Y Seeds
 
-Desde `backend/`, apuntando a Neon:
+Render aplica migraciones al arrancar el backend. Si necesitas ejecutarlas manualmente desde `backend/`, apuntando a Neon:
 
 ```powershell
 $env:APP_DATABASE_URL="postgresql+psycopg://USER:PASSWORD@HOST/DBNAME?sslmode=require"
