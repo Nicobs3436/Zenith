@@ -77,6 +77,7 @@ CoachV2Goal = Literal["strength", "hypertrophy", "fat_loss", "general_health", "
 CoachV2Sex = Literal["male", "female"]
 CoachV2Phase = Literal["onboarding", "plan_ready", "training_active", "progress_review", "fatigue_review", "adjustment_review"]
 CoachProposalStatus = Literal["pending", "accepted", "rejected", "expired"]
+CoachPhase = Literal["onboarding", "ready_for_plan", "plan_draft", "training_active"]
 
 
 class AiTrainingPlanGenerateRequest(BaseModel):
@@ -174,6 +175,66 @@ class CoachV2MessageRequest(BaseModel):
     def normalize_message(self) -> "CoachV2MessageRequest":
         self.message = self.message.strip()
         return self
+
+
+class CoachMessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1_500)
+    personal_data_acknowledged: bool = False
+    sensitive_data_acknowledged: bool = False
+
+    @model_validator(mode="after")
+    def normalize_message(self) -> "CoachMessageRequest":
+        self.message = self.message.strip()
+        return self
+
+
+class CoachProfileRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    goal: str | None
+    secondary_goal: str | None
+    plan_horizon_weeks: int | None
+    biological_sex: str | None
+    age: int | None
+    height_cm: int | None
+    weight_kg: int | None
+    experience_level: str | None
+    training_age_months: int | None
+    days_per_week: int | None
+    session_duration_minutes: int | None
+    equipment: list[str]
+    priorities: list[str]
+    preferred_exercises: list[str]
+    avoided_exercises: list[str]
+    physical_limitations: str | None
+    sleep_quality: str | None
+    stress_level: str | None
+    current_fatigue: str | None
+    personal_data_acknowledged: bool
+    sensitive_data_acknowledged: bool
+    memory_summary: str | None
+    updated_at: datetime
+
+
+class CoachMessageRead(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class CoachStateRead(BaseModel):
+    profile: CoachProfileRead
+    phase: CoachPhase
+    recent_messages: list[CoachMessageRead]
+    assistant_message: str
+    missing_required_fields: list[str]
+    ready_for_plan: bool
+    draft_plans: list[AiTrainingPlanRead]
+    accepted_plan: AiTrainingPlanRead | None
+    privacy_notice: str
+    safety_notice: str
+    next_action: str | None = None
 
 
 class CoachV2ProfileRead(BaseModel):

@@ -27,6 +27,12 @@ from app.application.coach_v2_service import (
     CoachV2ProposalNotPendingError,
     coach_v2_service,
 )
+from app.application.coach_service import (
+    CoachCannotGenerateError,
+    CoachPlanNotDraftError,
+    CoachPlanNotFoundError,
+    coach_service,
+)
 from app.application.ai_session_summary_service import (
     AiSessionSummaryCannotGenerateError,
     AiSessionSummaryNotFoundError,
@@ -49,7 +55,9 @@ from app.domain.ai import (
     AiTrainingPlanModifyRequest,
     AiTrainingPlanRead,
     CoachPlannedSessionRead,
+    CoachMessageRequest,
     CoachProposalRead,
+    CoachStateRead,
     CoachV2MessageRequest,
     CoachV2StateRead,
 )
@@ -57,6 +65,89 @@ from app.infrastructure.db.models.user import User
 from app.infrastructure.db.session import get_db
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+@router.get("/coach", response_model=CoachStateRead)
+def get_coach_state(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return coach_service.get_state(db, current_user)
+
+
+@router.post("/coach/messages", response_model=CoachStateRead)
+def add_coach_message(
+    data: CoachMessageRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return coach_service.add_message(db, current_user, data)
+
+
+@router.post("/coach/plans", response_model=AiTrainingPlanRead, status_code=status.HTTP_201_CREATED)
+def generate_coach_plan(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    try:
+        return coach_service.generate_plan(db, current_user)
+    except CoachCannotGenerateError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/coach/plans/{plan_id}/accept", response_model=AiTrainingPlanRead)
+def accept_coach_plan(
+    plan_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    try:
+        return coach_service.accept_plan(db, plan_id, current_user)
+    except CoachPlanNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coach plan not found.") from error
+    except CoachPlanNotDraftError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Coach plan is not a draft.") from error
+    except CoachCannotGenerateError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/coach/plans/{plan_id}/reject", response_model=AiTrainingPlanRead)
+def reject_coach_plan(
+    plan_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    try:
+        return coach_service.reject_plan(db, plan_id, current_user)
+    except CoachPlanNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coach plan not found.") from error
+    except CoachPlanNotDraftError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Coach plan is not a draft.") from error
+
+
+@router.post("/coach/plans/{plan_id}/modify", response_model=AiTrainingPlanRead, status_code=status.HTTP_201_CREATED)
+def modify_coach_plan(
+    plan_id: UUID,
+    data: AiTrainingPlanModifyRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    try:
+        return coach_service.modify_plan(db, plan_id, current_user, data)
+    except CoachPlanNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coach plan not found.") from error
+    except CoachPlanNotDraftError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Coach plan is not a draft.") from error
+    except CoachCannotGenerateError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/coach/reset", response_model=CoachStateRead)
+def reset_coach(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return coach_service.reset(db, current_user)
 
 
 @router.get("/coach/v2", response_model=CoachV2StateRead)

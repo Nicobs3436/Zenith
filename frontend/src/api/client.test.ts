@@ -263,6 +263,98 @@ describe('api client auth refresh', () => {
     );
   });
 
+  it('calls clean Coach endpoints', async () => {
+    const plan = {
+      id: 'plan-1',
+      user_id: 'user-1',
+      status: 'draft',
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      days_per_week: 4,
+      session_duration_minutes: 60,
+      available_equipment: ['mancuernas'],
+      physical_limitations: null,
+      sensitive_data_acknowledged: false,
+      priorities: [],
+      plan_payload: { version: 3, coach_version: 1, routines: [] },
+      explanation: 'Plan Coach',
+      risk_notes: null,
+      confidence: 'medium',
+      input_summary: { source: 'coach_clean' },
+      provider: 'groq',
+      model: 'llama-3.3-70b-versatile',
+      fallback_used: false,
+      created_at: '2026-07-08T10:00:00Z',
+      reviewed_at: null,
+    };
+    const state = {
+      profile: {
+        id: 'profile-1',
+        user_id: 'user-1',
+        goal: 'hypertrophy',
+        secondary_goal: null,
+        plan_horizon_weeks: null,
+        biological_sex: 'male',
+        age: 29,
+        height_cm: 180,
+        weight_kg: 80,
+        experience_level: 'intermediate',
+        training_age_months: null,
+        days_per_week: 4,
+        session_duration_minutes: 60,
+        equipment: ['mancuernas'],
+        priorities: [],
+        preferred_exercises: [],
+        avoided_exercises: [],
+        physical_limitations: null,
+        sleep_quality: null,
+        stress_level: null,
+        current_fatigue: null,
+        personal_data_acknowledged: true,
+        sensitive_data_acknowledged: false,
+        memory_summary: null,
+        updated_at: '2026-07-08T10:00:00Z',
+      },
+      phase: 'ready_for_plan',
+      recent_messages: [],
+      assistant_message: 'Listo',
+      missing_required_fields: [],
+      ready_for_plan: true,
+      draft_plans: [plan],
+      accepted_plan: null,
+      privacy_notice: 'Privacidad',
+      safety_notice: 'Seguridad',
+      next_action: 'generate_plan',
+    };
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(state))
+      .mockResolvedValueOnce(jsonResponse(state))
+      .mockResolvedValueOnce(jsonResponse(plan))
+      .mockResolvedValueOnce(jsonResponse({ ...plan, status: 'accepted' }))
+      .mockResolvedValueOnce(jsonResponse({ ...plan, status: 'rejected' }))
+      .mockResolvedValueOnce(jsonResponse({ ...plan, id: 'plan-2' }))
+      .mockResolvedValueOnce(jsonResponse({ ...state, phase: 'onboarding', draft_plans: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = await loadClient();
+
+    await expect(client.getCoachState()).resolves.toEqual(state);
+    await expect(client.sendCoachMessage({ message: 'Hola', personal_data_acknowledged: true, sensitive_data_acknowledged: false })).resolves.toEqual(state);
+    await expect(client.generateCoachPlan()).resolves.toEqual(plan);
+    await expect(client.acceptCoachPlan('plan-1')).resolves.toEqual({ ...plan, status: 'accepted' });
+    await expect(client.rejectCoachPlan('plan-1')).resolves.toEqual({ ...plan, status: 'rejected' });
+    await expect(client.modifyCoachPlan('plan-1', { instruction: 'Cambia pecho', sensitive_data_acknowledged: false })).resolves.toEqual({ ...plan, id: 'plan-2' });
+    await expect(client.resetCoach()).resolves.toEqual({ ...state, phase: 'onboarding', draft_plans: [] });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://localhost:8000/ai/coach', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://localhost:8000/ai/coach/messages', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'http://localhost:8000/ai/coach/plans', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(4, 'http://localhost:8000/ai/coach/plans/plan-1/accept', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(5, 'http://localhost:8000/ai/coach/plans/plan-1/reject', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(6, 'http://localhost:8000/ai/coach/plans/plan-1/modify', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(7, 'http://localhost:8000/ai/coach/reset', expect.objectContaining({ method: 'POST' }));
+  });
+
   it('calls AI session summary endpoints', async () => {
     const summary = {
       id: 'summary-1',

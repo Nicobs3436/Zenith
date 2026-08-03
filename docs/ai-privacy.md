@@ -2,7 +2,7 @@
 
 ## Decision Actual
 
-- Fase implementada: Coach V2 conversacional continuo con Coach V3 para planes IA revisables.
+- Fase implementada: Coach limpio en `/ai/coach` con conversacion continua y planes IA revisables; Coach V2/intake quedan legacy.
 - Proveedor por defecto local: reglas locales dentro del backend.
 - Proveedor publico para Coach V3: Groq configurado con `APP_AI_PROVIDER=groq` y `APP_AI_EXTERNAL_DATA_ENABLED=true`.
 - Proveedor opcional local: Ollama configurado con `APP_AI_PROVIDER=ollama`.
@@ -20,7 +20,7 @@
 - Sesiones activas no borradas.
 - Series estructuradas: reps, peso/unidad, RPE/RIR y descanso.
 - Para planes adaptativos legacy: objetivo, nivel, dias disponibles, duracion, equipamiento disponible, prioridades, catalogo estructurado de ejercicios accesibles y limitaciones fisicas si el usuario las confirma explicitamente.
-- Para Coach V3: objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion, equipamiento, prioridades, ejercicios evitados y limitaciones fisicas solo si el usuario las confirma; la IA puede proponer ejercicios fuera del catalogo y el backend los crea como privados solo al aceptar.
+- Para Coach nuevo: objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion, equipamiento, prioridades, ejercicios evitados y limitaciones fisicas solo si el usuario las confirma; la IA puede proponer ejercicios fuera del catalogo y el backend los crea como privados solo al aceptar.
 - Para entrevista conversacional del Coach: resumen estructurado de objetivo, nivel, dias, duracion, equipamiento, prioridades y limitaciones solo con confirmacion; se guardan solo los ultimos mensajes necesarios, no el historial completo.
 - Para Coach V2: perfil estructurado con objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion, equipamiento, prioridades, ejercicios evitados y limitaciones solo con aviso confirmado. Se guarda memoria resumida, propuestas y ultimos mensajes necesarios, no historial completo.
 - Para modificar planes adaptativos: la instruccion libre del usuario, el resumen estructurado del plan original y los mismos campos de planificacion; no se usan notas, email, username ni tokens.
@@ -63,6 +63,7 @@ Cada sugerencia guarda:
 - La entrevista conversacional `POST /ai/coach/intake/messages` persiste un unico intake activo por usuario con resumen estructurado, ultimos mensajes, campos faltantes y estado `ready_for_plan`; no crea rutinas ni sesiones.
 - `POST /ai/coach/intake/generate-plan` solo genera un plan borrador si el intake contiene objetivo, nivel, dias por semana y duracion; reutiliza la validacion estricta de planes adaptativos.
 - `POST /ai/coach/v2/generate-plan` solo genera un plan borrador si el perfil contiene los datos obligatorios. El plan sigue siendo revisable y solo crea rutinas reales al aceptar.
+- El flujo visible nuevo usa `GET /ai/coach`, `POST /ai/coach/messages`, `POST /ai/coach/plans` y acciones bajo `/ai/coach/plans/{id}`. Los borradores nuevos se marcan como `source=coach_clean` para no mezclar planes legacy.
 - Coach V2 puede crear propuestas automaticas y sesiones futuras recomendadas; no aplica cambios ni registra sesiones historicas sin accion del usuario.
 - Generar un resumen post-sesion crea o actualiza `AiSessionSummary`; no modifica sesiones, series ni rutinas.
 - En resumenes post-sesion, Ollama solo puede enriquecer textos/listas del resumen; no aplica cambios.
