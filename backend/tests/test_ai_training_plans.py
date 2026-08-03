@@ -275,8 +275,8 @@ def test_ollama_provider_generates_training_plan_structure(
     assert data["input_summary"]["ai_provider"]["provider"] == "ollama"
     assert data["input_summary"]["ai_provider"]["fallback_used"] is False
     assert "Molestia privada de rodilla" in captured_body["body"]
-    assert "exercise_catalog" in captured_body["body"]
-    assert "exercise_id" in captured_body["body"]
+    assert "sin limitarte a una base de datos" in captured_body["body"]
+    assert "plan_payload v3" in captured_body["body"]
     assert "owner@example.com" not in captured_body["body"]
 
 

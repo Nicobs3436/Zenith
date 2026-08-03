@@ -458,21 +458,20 @@ class OllamaAiProvider:
             "physical_limitations": context.physical_limitations,
             "modification_instruction": context.modification_instruction,
             "validation_errors_to_fix": context.validation_errors or [],
-            "exercise_catalog": context.exercise_catalog or [],
         }
         return (
-            "Eres un entrenador personal de fuerza e hipertrofia. Crea un plan semanal personalizado y seguro. "
-            "Usa SOLO exercise_id del exercise_catalog. No inventes ejercicios ni ids. "
-            "Respeta dias_por_semana, duracion, nivel, objetivo, equipamiento, prioridades y limitaciones fisicas si existen. "
-            "Programa con criterio: split coherente, compuestos antes que accesorios, volumen razonable, descanso suficiente, "
-            "evita repetir exactamente los mismos ejercicios todos los dias y evita sesiones redundantes. "
-            "No incluyas diagnosticos medicos ni promesas absolutas. Devuelve solo JSON valido con keys: "
-            "routines, progression, explanation, risk_notes, confidence. "
-            "confidence debe ser low, medium o high. routines debe tener exactamente days_per_week elementos. "
-            "Cada routine debe tener: day, name, focus, description, exercises. "
-            "Cada exercise debe tener: exercise_id, exercise_name, target_sets, target_reps_min, target_reps_max, "
-            "target_rpe, target_rir, rest_seconds, reason. "
+            "Eres el entrenador personal de Zenith. Disena el mejor programa posible para el usuario, sin limitarte a una base de datos de ejercicios. "
+            "Devuelve SOLO JSON valido. No diagnostiques, no prometas resultados absolutos y no incluyas datos personales no aportados. "
+            "El JSON debe ser plan_payload v3 y tener keys: version, generated_by, program_blueprint, coach_rationale, exercise_resolution, "
+            "weekly_schedule, volume_by_muscle, progression_model, routines, validation_report, acceptance_effects, explanation, risk_notes, confidence. "
+            "version debe ser 3. generated_by.provider debe ser ollama. confidence debe ser low, medium o high. "
+            "Primero disena la arquitectura del programa: split, volumen semanal por musculo, roles por dia y progresion. Luego elige ejercicios. "
+            "No uses ejercicios que el usuario pidio evitar en priorities con formato 'evitar ...'. "
+            "routines debe tener exactamente days_per_week elementos. Cada routine debe tener: day, name, focus, description, target_duration_minutes, session_role, exercises. "
+            "Cada exercise debe tener: exercise_id null, exercise_name, description, technique_notes, difficulty, equipment, slot, role, movement_pattern, "
+            "primary_muscle, secondary_muscles, target_sets, target_reps_min, target_reps_max, target_rpe, target_rir, rest_seconds, reason, progression_hint. "
             "Rangos seguros: target_sets 1-8, reps 1-30, target_rpe 6-9, target_rir 0-4, rest_seconds 45-300. "
+            "Usa compuestos antes que accesorios, reparte volumen por semana, justifica cada ejercicio y declara que ejercicios nuevos se crearan solo al aceptar. "
             "Contexto estructurado: "
             f"{json.dumps(safe_context, ensure_ascii=False)}"
         )
@@ -574,6 +573,22 @@ class OllamaAiProvider:
     def _parse_training_plan_structure_response(self, data: Any) -> AiTrainingPlanStructureProviderResult:
         if not isinstance(data, dict):
             raise AiProviderError("Ollama response is not an object.")
+        if data.get("version") == 3:
+            explanation = self._text(data.get("explanation") or (data.get("coach_rationale") or {}).get("summary"))
+            risk_notes = self._text(data.get("risk_notes"), required=False)
+            confidence_value = data.get("confidence") or "medium"
+            confidence = self._text(confidence_value)
+            if confidence not in VALID_CONFIDENCE:
+                raise AiProviderError("Ollama confidence is invalid.")
+            return AiTrainingPlanStructureProviderResult(
+                plan_payload=data,
+                explanation=explanation,
+                risk_notes=risk_notes,
+                confidence=confidence,
+                provider=self.provider,
+                model=self.model,
+                external_data_sent=self.external_data_sent,
+            )
         routines = data.get("routines")
         if not isinstance(routines, list):
             raise AiProviderError("Ollama training plan routines are invalid.")

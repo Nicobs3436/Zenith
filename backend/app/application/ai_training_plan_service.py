@@ -13,7 +13,7 @@ from app.application.ai_provider import (
 )
 from app.domain.ai import AiTrainingPlanGenerateRequest, AiTrainingPlanModifyRequest
 from app.infrastructure.db.models.ai import AiTrainingPlan
-from app.infrastructure.db.models.exercise import Exercise
+from app.infrastructure.db.models.exercise import Equipment, Exercise, MuscleGroup
 from app.infrastructure.db.models.user import User
 from app.infrastructure.db.repositories.exercises import ExerciseRepository
 from app.infrastructure.db.repositories.routines import RoutineRepository
@@ -33,15 +33,28 @@ class AiTrainingPlanCannotGenerateError(Exception):
 
 
 class AiTrainingPlanService:
-    def generate_plan(self, db: Session, user: User, data: AiTrainingPlanGenerateRequest) -> AiTrainingPlan:
+    def generate_plan(
+        self,
+        db: Session,
+        user: User,
+        data: AiTrainingPlanGenerateRequest,
+        *,
+        require_ai_provider: bool = False,
+        coach_brief: dict | None = None,
+    ) -> AiTrainingPlan:
         data = self._with_normalized_limitations(data)
         exercises = self._exercise_pool(db, user, data.available_equipment)
-        if not exercises:
+        if not exercises and not require_ai_provider:
             raise AiTrainingPlanCannotGenerateError("No accessible exercises available.")
 
-        provider_result = self._generate_plan_with_provider(data, exercises)
+        provider_result = self._generate_plan_with_provider(data, exercises, require_ai_provider=require_ai_provider)
         plan_payload = provider_result.plan_payload
+        if coach_brief is not None and plan_payload.get("version") == 3:
+            plan_payload["coach_brief"] = coach_brief
+        plan_payload = self._resolve_plan_exercises(plan_payload, data, exercises)
         self._validate_plan_payload(plan_payload, data, exercises)
+        if plan_payload.get("version") == 3:
+            plan_payload["generated_by"] = {**dict(plan_payload.get("generated_by") or {}), "backend_validated": True}
         input_summary = self._input_summary(data, exercises, provider_result)
         plan = AiTrainingPlanRepository(db).create(
             user_id=user.id,
@@ -85,6 +98,7 @@ class AiTrainingPlanService:
         routine_repository = RoutineRepository(db)
         exercise_repository = ExerciseRepository(db)
         created_routine_ids: list[str] = []
+        created_private_exercise_ids: list[str] = []
         for day in plan.plan_payload.get("routines", []):
             routine = routine_repository.create(
                 user_id=user.id,
@@ -93,9 +107,19 @@ class AiTrainingPlanService:
                 goal=plan.goal,
             )
             for position, planned in enumerate(day.get("exercises", []), start=1):
-                exercise_id = UUID(str(planned["exercise_id"]))
-                if exercise_repository.get_accessible(exercise_id, user.id) is None:
-                    raise AiTrainingPlanCannotGenerateError("Plan references an inaccessible exercise.")
+                exercise_id_value = planned.get("exercise_id")
+                if exercise_id_value:
+                    exercise_id = UUID(str(exercise_id_value))
+                    if exercise_repository.get_accessible(exercise_id, user.id) is None:
+                        raise AiTrainingPlanCannotGenerateError("Plan references an inaccessible exercise.")
+                elif planned.get("exercise_source") == "ai_generated_pending":
+                    exercise = self._create_private_exercise_from_plan(db, user, planned)
+                    exercise_id = exercise.id
+                    planned["exercise_id"] = str(exercise_id)
+                    planned["exercise_source"] = "ai_generated_private"
+                    created_private_exercise_ids.append(str(exercise_id))
+                else:
+                    raise AiTrainingPlanCannotGenerateError("Plan exercise could not be resolved.")
                 routine_repository.add_exercise(
                     routine=routine,
                     exercise_id=exercise_id,
@@ -114,7 +138,11 @@ class AiTrainingPlanService:
 
         plan.status = "accepted"
         plan.reviewed_at = datetime.now(UTC)
-        plan.plan_payload = {**plan.plan_payload, "created_routine_ids": created_routine_ids}
+        plan.plan_payload = {
+            **plan.plan_payload,
+            "created_routine_ids": created_routine_ids,
+            "created_private_exercise_ids": created_private_exercise_ids,
+        }
         db.commit()
         return repository.get_by_user(plan.id, user.id) or plan
 
@@ -260,8 +288,11 @@ class AiTrainingPlanService:
         exercises: list[Exercise],
         *,
         modification_instruction: str | None = None,
+        require_ai_provider: bool = False,
     ) -> AiTrainingPlanStructureProviderResult:
         provider = build_ai_provider()
+        if require_ai_provider and getattr(provider, "provider", None) != "ollama":
+            raise AiTrainingPlanCannotGenerateError("Coach V3 requires Ollama as the AI provider.")
         context = self._provider_context(data, exercises, modification_instruction=modification_instruction)
         if hasattr(provider, "build_training_plan_structure"):
             try:
@@ -280,10 +311,14 @@ class AiTrainingPlanService:
                     self._validate_plan_payload(result.plan_payload, data, exercises)
                     return result
                 except (AiProviderError, AiTrainingPlanCannotGenerateError):
+                    if require_ai_provider:
+                        raise AiTrainingPlanCannotGenerateError("Ollama could not generate a valid Coach V3 plan.")
                     fallback = self._internal_plan_result(data, exercises, provider=provider, fallback_used=True)
                     self._validate_plan_payload(fallback.plan_payload, data, exercises)
                     return fallback
 
+        if require_ai_provider:
+            raise AiTrainingPlanCannotGenerateError("Coach V3 requires an AI provider that can generate plan structure.")
         fallback = self._internal_plan_result(data, exercises, provider=provider, fallback_used=False)
         self._validate_plan_payload(fallback.plan_payload, data, exercises)
         return fallback
@@ -351,6 +386,10 @@ class AiTrainingPlanService:
         data: AiTrainingPlanGenerateRequest,
         exercises: list[Exercise],
     ) -> None:
+        if plan_payload.get("version") == 3:
+            self._validate_plan_payload_v3(plan_payload, data, exercises)
+            return
+
         routines = plan_payload.get("routines")
         if not isinstance(routines, list) or len(routines) != data.days_per_week:
             raise AiTrainingPlanCannotGenerateError("Generated plan routine count is invalid.")
@@ -370,9 +409,109 @@ class AiTrainingPlanService:
                 self._validate_planned_exercise(planned, accessible_exercise_ids)
         self._validate_plan_quality(routines, data, exercises)
 
+    def _validate_plan_payload_v3(self, plan_payload: dict, data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]) -> None:
+        required_sections = [
+            "generated_by",
+            "program_blueprint",
+            "coach_rationale",
+            "exercise_resolution",
+            "weekly_schedule",
+            "volume_by_muscle",
+            "progression_model",
+            "validation_report",
+            "acceptance_effects",
+        ]
+        for section in required_sections:
+            if not isinstance(plan_payload.get(section), dict if section not in {"weekly_schedule"} else list):
+                raise AiTrainingPlanCannotGenerateError(f"Generated Coach V3 plan is missing {section}.")
+        if plan_payload["generated_by"].get("provider") != "ollama":
+            raise AiTrainingPlanCannotGenerateError("Generated Coach V3 plan must be generated by Ollama.")
+        routines = plan_payload.get("routines")
+        if not isinstance(routines, list) or len(routines) != data.days_per_week:
+            raise AiTrainingPlanCannotGenerateError("Generated plan routine count is invalid.")
+        if not plan_payload.get("progression_model"):
+            raise AiTrainingPlanCannotGenerateError("Generated plan progression is missing.")
+        if not plan_payload.get("volume_by_muscle"):
+            raise AiTrainingPlanCannotGenerateError("Generated plan weekly volume is missing.")
+
+        accessible_exercise_ids = {str(exercise.id) for exercise in exercises}
+        for index, routine in enumerate(routines, start=1):
+            if not isinstance(routine, dict):
+                raise AiTrainingPlanCannotGenerateError("Generated plan routine is invalid.")
+            if routine.get("day") != index:
+                raise AiTrainingPlanCannotGenerateError("Generated plan routine day is invalid.")
+            if not isinstance(routine.get("name"), str) or not routine["name"].strip():
+                raise AiTrainingPlanCannotGenerateError("Generated plan routine name is invalid.")
+            if not isinstance(routine.get("focus"), str) or not routine["focus"].strip():
+                raise AiTrainingPlanCannotGenerateError("Generated plan routine focus is invalid.")
+            if not isinstance(routine.get("exercises"), list) or not routine["exercises"]:
+                raise AiTrainingPlanCannotGenerateError("Generated plan exercises are invalid.")
+            for planned in routine["exercises"]:
+                self._validate_planned_exercise_v3(planned, accessible_exercise_ids, data)
+        self._validate_plan_quality(routines, data, exercises)
+
+    def _validate_planned_exercise_v3(self, planned: dict, accessible_exercise_ids: set[str], data: AiTrainingPlanGenerateRequest) -> None:
+        if not isinstance(planned, dict):
+            raise AiTrainingPlanCannotGenerateError("Generated plan exercise is invalid.")
+        source = planned.get("exercise_source") or "ai_generated_pending"
+        if source not in {"catalog_matched", "ai_generated_pending", "ai_generated_private"}:
+            raise AiTrainingPlanCannotGenerateError("Generated plan exercise source is invalid.")
+        exercise_id = planned.get("exercise_id")
+        if source == "catalog_matched" and (not isinstance(exercise_id, str) or exercise_id not in accessible_exercise_ids):
+            raise AiTrainingPlanCannotGenerateError("Generated plan references an inaccessible exercise.")
+        if source in {"ai_generated_pending", "ai_generated_private"} and exercise_id is not None and not isinstance(exercise_id, str):
+            raise AiTrainingPlanCannotGenerateError("Generated plan pending exercise id is invalid.")
+        required_strings = [
+            "exercise_name",
+            "description",
+            "technique_notes",
+            "difficulty",
+            "slot",
+            "role",
+            "movement_pattern",
+            "primary_muscle",
+            "reason",
+            "progression_hint",
+        ]
+        for field in required_strings:
+            if not isinstance(planned.get(field), str) or not planned[field].strip():
+                raise AiTrainingPlanCannotGenerateError(f"Generated plan exercise is missing {field}.")
+        if planned["difficulty"] not in {"beginner", "intermediate", "advanced"}:
+            raise AiTrainingPlanCannotGenerateError("Generated plan exercise difficulty is invalid.")
+        if not isinstance(planned.get("equipment"), list) or not planned["equipment"]:
+            raise AiTrainingPlanCannotGenerateError("Generated plan exercise equipment is invalid.")
+        if not all(isinstance(item, str) and item.strip() for item in planned["equipment"]):
+            raise AiTrainingPlanCannotGenerateError("Generated plan exercise equipment is invalid.")
+        if not isinstance(planned.get("secondary_muscles"), list):
+            raise AiTrainingPlanCannotGenerateError("Generated plan exercise secondary muscles are invalid.")
+        if self._matches_avoided_exercise(planned["exercise_name"], data.priorities):
+            raise AiTrainingPlanCannotGenerateError("Generated plan includes an avoided exercise.")
+        self._validate_planned_exercise_prescription(planned)
+
+    def _validate_planned_exercise_prescription(self, planned: dict) -> None:
+        target_sets = planned.get("target_sets")
+        reps_min = planned.get("target_reps_min")
+        reps_max = planned.get("target_reps_max")
+        rest_seconds = planned.get("rest_seconds")
+        target_rir = planned.get("target_rir")
+        if not isinstance(target_sets, int) or target_sets < 1 or target_sets > 8:
+            raise AiTrainingPlanCannotGenerateError("Generated plan target sets are invalid.")
+        if not isinstance(reps_min, int) or not isinstance(reps_max, int) or reps_min < 1 or reps_max > 30 or reps_min > reps_max:
+            raise AiTrainingPlanCannotGenerateError("Generated plan target reps are invalid.")
+        if not isinstance(rest_seconds, int) or rest_seconds < 45 or rest_seconds > 300:
+            raise AiTrainingPlanCannotGenerateError("Generated plan rest is invalid.")
+        if target_rir is not None and (not isinstance(target_rir, int) or target_rir < 0 or target_rir > 4):
+            raise AiTrainingPlanCannotGenerateError("Generated plan target RIR is invalid.")
+        try:
+            target_rpe = float(planned.get("target_rpe"))
+        except (TypeError, ValueError) as error:
+            raise AiTrainingPlanCannotGenerateError("Generated plan target RPE is invalid.") from error
+        if target_rpe < 6 or target_rpe > 9:
+            raise AiTrainingPlanCannotGenerateError("Generated plan target RPE is invalid.")
+
     def _validate_plan_quality(self, routines: list[dict], data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]) -> None:
         exercise_sets = [
-            {str(planned.get("exercise_id")) for planned in routine.get("exercises", []) if isinstance(planned, dict)}
+            {str(planned.get("exercise_id") or planned.get("exercise_name")) for planned in routine.get("exercises", []) if isinstance(planned, dict)}
             for routine in routines
         ]
         if data.days_per_week > 1 and len(exercises) >= 4 and len({frozenset(item) for item in exercise_sets}) == 1:
@@ -418,6 +557,103 @@ class AiTrainingPlanService:
             raise AiTrainingPlanCannotGenerateError("Generated plan target RPE is invalid.") from error
         if target_rpe < 1 or target_rpe > 10:
             raise AiTrainingPlanCannotGenerateError("Generated plan target RPE is invalid.")
+
+    def _resolve_plan_exercises(self, plan_payload: dict, data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]) -> dict:
+        if plan_payload.get("version") != 3:
+            return plan_payload
+        by_name = {self._normalize(exercise.name): exercise for exercise in exercises}
+        accessible_ids = {str(exercise.id) for exercise in exercises}
+        items = []
+        counts = {"catalog_matched_count": 0, "ai_generated_pending_count": 0, "invalid_unresolvable_count": 0}
+        routines = []
+        for routine in plan_payload.get("routines", []):
+            resolved_exercises = []
+            for planned in routine.get("exercises", []):
+                resolved = dict(planned)
+                name = str(resolved.get("exercise_name") or "").strip()
+                exercise_id = resolved.get("exercise_id")
+                if isinstance(exercise_id, str) and exercise_id in accessible_ids:
+                    resolved["exercise_source"] = "catalog_matched"
+                    status = "catalog_matched"
+                    counts["catalog_matched_count"] += 1
+                else:
+                    match = by_name.get(self._normalize(name)) if name else None
+                    if match is not None:
+                        resolved["exercise_id"] = str(match.id)
+                        resolved["exercise_source"] = "catalog_matched"
+                        status = "catalog_matched"
+                        counts["catalog_matched_count"] += 1
+                    else:
+                        resolved["exercise_id"] = None
+                        resolved["exercise_source"] = "ai_generated_pending"
+                        status = "ai_generated_pending"
+                        counts["ai_generated_pending_count"] += 1
+                items.append({"exercise_name": name, "exercise_id": resolved.get("exercise_id"), "status": status})
+                resolved_exercises.append(resolved)
+            routines.append({**routine, "exercises": resolved_exercises})
+
+        acceptance_effects = dict(plan_payload.get("acceptance_effects") or {})
+        acceptance_effects.update(
+            {
+                "will_create_private_exercises": counts["ai_generated_pending_count"] > 0,
+                "private_exercise_count": counts["ai_generated_pending_count"],
+                "will_create_routines": True,
+                "routine_count": data.days_per_week,
+                "requires_user_acceptance": True,
+            }
+        )
+        return {
+            **plan_payload,
+            "routines": routines,
+            "exercise_resolution": {"summary": counts, "items": items},
+            "acceptance_effects": acceptance_effects,
+        }
+
+    def _create_private_exercise_from_plan(self, db: Session, user: User, planned: dict) -> Exercise:
+        muscle_names = [planned["primary_muscle"], *list(planned.get("secondary_muscles") or [])]
+        muscles = self._resolve_named_references(db, MuscleGroup, muscle_names)
+        equipment = self._resolve_named_references(db, Equipment, list(planned.get("equipment") or []))
+        exercise = Exercise(
+            name=planned["exercise_name"].strip(),
+            description=planned["description"].strip(),
+            difficulty=planned["difficulty"].strip(),
+            technique_notes=planned["technique_notes"].strip(),
+            is_global=False,
+            created_by_user_id=user.id,
+            muscle_groups=muscles,
+            equipment=equipment,
+        )
+        db.add(exercise)
+        db.flush()
+        return exercise
+
+    def _resolve_named_references(self, db: Session, model, names: list[str]):
+        existing = {self._normalize(item.name): item for item in db.query(model).all()}
+        resolved = []
+        seen = set()
+        for raw_name in names:
+            name = str(raw_name).strip()
+            normalized = self._normalize(name)
+            if not name or normalized in seen:
+                continue
+            seen.add(normalized)
+            item = existing.get(normalized)
+            if item is None:
+                item = model(name=name)
+                db.add(item)
+                db.flush()
+                existing[normalized] = item
+            resolved.append(item)
+        return resolved
+
+    def _matches_avoided_exercise(self, exercise_name: str, priorities: list[str]) -> bool:
+        name = self._normalize(exercise_name)
+        avoided = []
+        for priority in priorities:
+            normalized = self._normalize(priority)
+            if normalized.startswith("evitar "):
+                avoided.append(normalized.removeprefix("evitar ").strip())
+        return any(item and item in name for item in avoided)
 
     def _apply_modification_instruction(
         self, data: AiTrainingPlanGenerateRequest, instruction: str

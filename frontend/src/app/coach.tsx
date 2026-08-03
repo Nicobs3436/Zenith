@@ -59,6 +59,42 @@ function planRoutines(plan: AiTrainingPlan) {
   return Array.isArray(routines) ? routines.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null) : [];
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function asRecords(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null) : [];
+}
+
+function asStrings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+}
+
+function textValue(value: unknown, fallback = '-') {
+  if (typeof value === 'string' && value.trim()) return value;
+  if (typeof value === 'number') return String(value);
+  return fallback;
+}
+
+function volumeEntries(plan: AiTrainingPlan) {
+  const volume = asRecord(plan.plan_payload.volume_by_muscle);
+  return Object.entries(volume).map(([muscle, raw]) => ({ muscle, data: asRecord(raw) }));
+}
+
+function resolutionSummary(plan: AiTrainingPlan) {
+  return asRecord(asRecord(plan.plan_payload.exercise_resolution).summary);
+}
+
+function progressionSummary(plan: AiTrainingPlan) {
+  const progression = asRecord(plan.plan_payload.progression_model);
+  return [textValue(progression.type, ''), textValue(progression.load_rule, ''), textValue(progression.rep_rule, '')].filter(Boolean).join(' · ');
+}
+
+function isV3Plan(plan: AiTrainingPlan) {
+  return plan.plan_payload.version === 3;
+}
+
 export default function CoachScreen() {
   const [state, setState] = useState<CoachV2State | null>(null);
   const [plans, setPlans] = useState<AiTrainingPlan[]>([]);
@@ -308,7 +344,46 @@ export default function CoachScreen() {
             <View style={styles.cardHeader}><Text style={styles.itemTitle}>{plan.days_per_week} dias · {goalLabel(plan.goal)}</Text><ZenithPill active>{plan.status}</ZenithPill></View>
             <Text style={styles.cardText}>{plan.explanation}</Text>
             {plan.risk_notes && <Text style={styles.risk}>{plan.risk_notes}</Text>}
-            {planRoutines(plan).slice(0, 3).map((routine, index) => <Text key={`${plan.id}-${index}`} style={styles.cardText}>Dia {index + 1}: {typeof routine.name === 'string' ? routine.name : 'Sesion'} · {Array.isArray(routine.exercises) ? routine.exercises.length : 0} ejercicios</Text>)}
+            {isV3Plan(plan) ? (
+              <View style={styles.previewBlock}>
+                <View style={styles.previewBox}>
+                  <Text style={styles.previewTitle}>Resumen IA</Text>
+                  <Text style={styles.cardText}>Split: {textValue(asRecord(plan.plan_payload.program_blueprint).split_name)}</Text>
+                  <Text style={styles.cardText}>Estrategia: {textValue(asRecord(plan.plan_payload.program_blueprint).strategy)}</Text>
+                  <Text style={styles.cardText}>Por que: {textValue(asRecord(plan.plan_payload.coach_rationale).summary)}</Text>
+                </View>
+                <View style={styles.previewBox}>
+                  <Text style={styles.previewTitle}>Ejercicios</Text>
+                  <Text style={styles.cardText}>Existentes: {textValue(resolutionSummary(plan).catalog_matched_count, '0')} · Nuevos IA: {textValue(resolutionSummary(plan).ai_generated_pending_count, '0')}</Text>
+                  <Text style={styles.cardText}>Los nuevos se crean en tu catalogo privado solo si aceptas el plan.</Text>
+                </View>
+                <View style={styles.previewBox}>
+                  <Text style={styles.previewTitle}>Volumen semanal</Text>
+                  {volumeEntries(plan).slice(0, 8).map(({ muscle, data }) => (
+                    <Text key={`${plan.id}-volume-${muscle}`} style={styles.cardText}>{muscle}: {textValue(data.direct_sets, '0')} series directas · rango {asStrings(data.target_range).join('-') || (Array.isArray(data.target_range) ? data.target_range.join('-') : '-')}</Text>
+                  ))}
+                </View>
+                <View style={styles.previewBox}>
+                  <Text style={styles.previewTitle}>Progresion</Text>
+                  <Text style={styles.cardText}>{progressionSummary(plan) || textValue(plan.plan_payload.progression)}</Text>
+                </View>
+                {planRoutines(plan).map((routine, index) => (
+                  <View key={`${plan.id}-routine-${index}`} style={styles.routinePreview}>
+                    <Text style={styles.previewTitle}>Dia {textValue(routine.day, String(index + 1))}: {textValue(routine.name, 'Sesion')}</Text>
+                    <Text style={styles.cardText}>{textValue(routine.description)}</Text>
+                    {asRecords(routine.exercises).map((exercise, exerciseIndex) => (
+                      <View key={`${plan.id}-routine-${index}-exercise-${exerciseIndex}`} style={styles.exercisePreview}>
+                        <Text style={styles.exerciseName}>{exerciseIndex + 1}. {textValue(exercise.exercise_name, 'Ejercicio')}</Text>
+                        <Text style={styles.cardText}>{textValue(exercise.exercise_source, 'ai_generated_pending')} · {textValue(exercise.primary_muscle)} · {textValue(exercise.target_sets, '0')}x{textValue(exercise.target_reps_min, '?')}-{textValue(exercise.target_reps_max, '?')} · RIR {textValue(exercise.target_rir)} · descanso {textValue(exercise.rest_seconds)}s</Text>
+                        <Text style={styles.cardText}>Motivo: {textValue(exercise.reason)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              planRoutines(plan).slice(0, 3).map((routine, index) => <Text key={`${plan.id}-${index}`} style={styles.cardText}>Dia {index + 1}: {typeof routine.name === 'string' ? routine.name : 'Sesion'} · {Array.isArray(routine.exercises) ? routine.exercises.length : 0} ejercicios</Text>)
+            )}
             <View style={styles.inlineActions}>
               <Pressable disabled={working === plan.id} onPress={() => submitAcceptPlan(plan.id)} style={[styles.primaryAction, working === plan.id && styles.disabled]}><Text style={styles.primaryActionText}>Aceptar y crear rutinas</Text></Pressable>
               <Pressable disabled={working === plan.id} onPress={() => submitRejectPlan(plan.id)} style={[styles.secondaryAction, working === plan.id && styles.disabled]}><Text style={styles.secondaryActionText}>Rechazar</Text></Pressable>
@@ -350,6 +425,12 @@ const styles = StyleSheet.create({
   cardHeader: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   itemTitle: { color: zenith.colors.foreground, flex: 1, fontFamily: zenith.font.bodyBold, fontSize: 16, lineHeight: 21 },
   cardText: { color: zenith.colors.muted, fontFamily: zenith.font.body, lineHeight: 20 },
+  previewBlock: { gap: 10 },
+  previewBox: { backgroundColor: zenith.colors.secondary, borderColor: zenith.colors.border, borderRadius: 14, borderWidth: 1, gap: 5, padding: 12 },
+  previewTitle: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, lineHeight: 20 },
+  routinePreview: { backgroundColor: zenith.colors.card, borderColor: zenith.colors.primaryBorder, borderRadius: 14, borderWidth: 1, gap: 8, padding: 12 },
+  exercisePreview: { borderColor: zenith.colors.border, borderRadius: 12, borderWidth: 1, gap: 4, padding: 10 },
+  exerciseName: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, lineHeight: 20 },
   risk: { color: '#fca5a5', fontFamily: zenith.font.bodyBold, lineHeight: 20 },
   empty: { backgroundColor: zenith.colors.card, borderColor: zenith.colors.border, borderRadius: 16, borderWidth: 1, color: zenith.colors.muted, fontFamily: zenith.font.body, padding: 16 },
 });

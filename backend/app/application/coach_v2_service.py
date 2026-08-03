@@ -92,7 +92,13 @@ class CoachV2Service:
             priorities=self._plan_priorities(profile),
         )
         try:
-            plan = ai_training_plan_service.generate_plan(db, user, request)
+            plan = ai_training_plan_service.generate_plan(
+                db,
+                user,
+                request,
+                require_ai_provider=True,
+                coach_brief=self._coach_brief(profile),
+            )
         except AiTrainingPlanCannotGenerateError as error:
             raise CoachV2CannotGenerateError(str(error)) from error
         repository.add_memory(user_id=user.id, event_type="plan_generated", summary="Coach V2 genero un plan borrador revisable.", payload={"plan_id": str(plan.id), "goal": profile.goal})
@@ -347,6 +353,24 @@ class CoachV2Service:
             f"evitar: {', '.join(profile.avoided_exercises)}" if profile.avoided_exercises else None,
         ]
         return "; ".join(item for item in parts if item)
+
+    def _coach_brief(self, profile: CoachProfile) -> dict[str, Any]:
+        return {
+            "goal": profile.goal,
+            "secondary_goal": profile.secondary_goal,
+            "level": profile.experience_level,
+            "biological_sex": profile.biological_sex,
+            "age": profile.age,
+            "height_cm": profile.height_cm,
+            "weight_kg": profile.weight_kg,
+            "days_per_week": profile.days_per_week,
+            "session_duration_minutes": profile.session_duration_minutes,
+            "equipment": profile.equipment,
+            "priorities": profile.priorities,
+            "avoided_exercises": profile.avoided_exercises,
+            "physical_limitations_summary": "limitaciones indicadas" if profile.physical_limitations and profile.sensitive_data_acknowledged else None,
+            "sensitive_data_acknowledged": profile.sensitive_data_acknowledged,
+        }
 
     def _store_memory(self, repository: CoachV2Repository, user_id: UUID, changed: list[str]) -> None:
         important = [field for field in changed if field in {"goal", "biological_sex", "equipment", "priorities", "avoided_exercises", "physical_limitations"}]
