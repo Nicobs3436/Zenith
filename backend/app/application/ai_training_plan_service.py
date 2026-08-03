@@ -5,7 +5,12 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.application.ai_provider import AiTrainingPlanProviderContext, enrich_training_plan_with_provider
+from app.application.ai_provider import (
+    AiProviderError,
+    AiTrainingPlanProviderContext,
+    AiTrainingPlanStructureProviderResult,
+    build_ai_provider,
+)
 from app.domain.ai import AiTrainingPlanGenerateRequest, AiTrainingPlanModifyRequest
 from app.infrastructure.db.models.ai import AiTrainingPlan
 from app.infrastructure.db.models.exercise import Exercise
@@ -34,9 +39,9 @@ class AiTrainingPlanService:
         if not exercises:
             raise AiTrainingPlanCannotGenerateError("No accessible exercises available.")
 
-        plan_payload = self._build_plan_payload(data, exercises)
+        provider_result = self._generate_plan_with_provider(data, exercises)
+        plan_payload = provider_result.plan_payload
         self._validate_plan_payload(plan_payload, data, exercises)
-        provider_result = self._enrich_plan_text(data, plan_payload)
         input_summary = self._input_summary(data, exercises, provider_result)
         plan = AiTrainingPlanRepository(db).create(
             user_id=user.id,
@@ -155,10 +160,14 @@ class AiTrainingPlanService:
         if not exercises:
             raise AiTrainingPlanCannotGenerateError("No accessible exercises available.")
 
-        plan_payload = self._build_plan_payload(modified_request, exercises)
+        provider_result = self._generate_plan_with_provider(
+            modified_request,
+            exercises,
+            modification_instruction=data.instruction,
+        )
+        plan_payload = provider_result.plan_payload
         plan_payload = self._post_process_plan_payload(plan_payload, post_process)
         self._validate_plan_payload(plan_payload, modified_request, exercises)
-        provider_result = self._enrich_plan_text(modified_request, plan_payload, modification_instruction=data.instruction)
         input_summary = self._input_summary(
             modified_request,
             exercises,
@@ -245,15 +254,49 @@ class AiTrainingPlanService:
             summary["modification_instruction"] = modification_instruction
         return summary
 
-    def _enrich_plan_text(
+    def _generate_plan_with_provider(
         self,
         data: AiTrainingPlanGenerateRequest,
-        plan_payload: dict,
+        exercises: list[Exercise],
         *,
         modification_instruction: str | None = None,
-    ):
-        routines = plan_payload.get("routines", [])
-        context = AiTrainingPlanProviderContext(
+    ) -> AiTrainingPlanStructureProviderResult:
+        provider = build_ai_provider()
+        context = self._provider_context(data, exercises, modification_instruction=modification_instruction)
+        if hasattr(provider, "build_training_plan_structure"):
+            try:
+                result = provider.build_training_plan_structure(context)
+                self._validate_plan_payload(result.plan_payload, data, exercises)
+                return result
+            except (AiProviderError, AiTrainingPlanCannotGenerateError) as error:
+                repair_context = self._provider_context(
+                    data,
+                    exercises,
+                    modification_instruction=modification_instruction,
+                    validation_errors=[str(error)],
+                )
+                try:
+                    result = provider.build_training_plan_structure(repair_context)
+                    self._validate_plan_payload(result.plan_payload, data, exercises)
+                    return result
+                except (AiProviderError, AiTrainingPlanCannotGenerateError):
+                    fallback = self._internal_plan_result(data, exercises, provider=provider, fallback_used=True)
+                    self._validate_plan_payload(fallback.plan_payload, data, exercises)
+                    return fallback
+
+        fallback = self._internal_plan_result(data, exercises, provider=provider, fallback_used=False)
+        self._validate_plan_payload(fallback.plan_payload, data, exercises)
+        return fallback
+
+    def _provider_context(
+        self,
+        data: AiTrainingPlanGenerateRequest,
+        exercises: list[Exercise],
+        *,
+        modification_instruction: str | None = None,
+        validation_errors: list[str] | None = None,
+    ) -> AiTrainingPlanProviderContext:
+        return AiTrainingPlanProviderContext(
             goal=data.goal,
             level=data.level,
             days_per_week=data.days_per_week,
@@ -261,13 +304,46 @@ class AiTrainingPlanService:
             available_equipment=data.available_equipment,
             priorities=data.priorities,
             has_physical_limitations=bool(data.physical_limitations),
-            routine_count=len(routines) if isinstance(routines, list) else 0,
-            exercises_per_routine=[len(routine.get("exercises", [])) for routine in routines if isinstance(routine, dict)],
+            routine_count=data.days_per_week,
+            exercises_per_routine=[],
             base_explanation=self._explanation(data),
             base_risk_notes=self._risk_notes(data),
             modification_instruction=modification_instruction,
+            exercise_catalog=self._exercise_catalog(exercises),
+            physical_limitations=data.physical_limitations if data.sensitive_data_acknowledged else None,
+            validation_errors=validation_errors,
         )
-        return enrich_training_plan_with_provider(context)
+
+    def _internal_plan_result(
+        self,
+        data: AiTrainingPlanGenerateRequest,
+        exercises: list[Exercise],
+        *,
+        provider,
+        fallback_used: bool,
+    ) -> AiTrainingPlanStructureProviderResult:
+        return AiTrainingPlanStructureProviderResult(
+            plan_payload=self._build_plan_payload(data, exercises),
+            explanation=self._explanation(data),
+            risk_notes=self._risk_notes(data),
+            confidence="medium",
+            provider=getattr(provider, "provider", "internal"),
+            model=getattr(provider, "model", "rules"),
+            external_data_sent=getattr(provider, "external_data_sent", False),
+            fallback_used=fallback_used,
+        )
+
+    def _exercise_catalog(self, exercises: list[Exercise]) -> list[dict]:
+        return [
+            {
+                "id": str(exercise.id),
+                "name": exercise.name,
+                "difficulty": exercise.difficulty,
+                "muscle_groups": [muscle.name for muscle in exercise.muscle_groups],
+                "equipment": [equipment.name for equipment in exercise.equipment],
+            }
+            for exercise in exercises[:80]
+        ]
 
     def _validate_plan_payload(
         self,
@@ -292,6 +368,30 @@ class AiTrainingPlanService:
                 raise AiTrainingPlanCannotGenerateError("Generated plan exercises are invalid.")
             for planned in planned_exercises:
                 self._validate_planned_exercise(planned, accessible_exercise_ids)
+        self._validate_plan_quality(routines, data, exercises)
+
+    def _validate_plan_quality(self, routines: list[dict], data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]) -> None:
+        exercise_sets = [
+            {str(planned.get("exercise_id")) for planned in routine.get("exercises", []) if isinstance(planned, dict)}
+            for routine in routines
+        ]
+        if data.days_per_week > 1 and len(exercises) >= 4 and len({frozenset(item) for item in exercise_sets}) == 1:
+            raise AiTrainingPlanCannotGenerateError("Generated plan repeats the same exercises every day.")
+        max_exercises = self._max_exercises_per_day(data.session_duration_minutes)
+        for routine in routines:
+            if len(routine.get("exercises", [])) > max_exercises:
+                raise AiTrainingPlanCannotGenerateError("Generated plan has too many exercises for session duration.")
+
+        if data.level == "beginner":
+            max_sets_per_day = 16
+        elif data.level == "advanced":
+            max_sets_per_day = 30
+        else:
+            max_sets_per_day = 24
+        for routine in routines:
+            total_sets = sum(int(planned.get("target_sets") or 0) for planned in routine.get("exercises", []) if isinstance(planned, dict))
+            if total_sets > max_sets_per_day:
+                raise AiTrainingPlanCannotGenerateError("Generated plan volume is too high for level.")
 
     def _validate_planned_exercise(self, planned: dict, accessible_exercise_ids: set[str]) -> None:
         if not isinstance(planned, dict):
@@ -381,35 +481,189 @@ class AiTrainingPlanService:
         return {**plan_payload, "routines": routines}
 
     def _build_plan_payload(self, data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]) -> dict:
-        prescription = self._prescription_for(data.goal, data.level)
         routines = []
-        exercises_per_day = 3 if data.session_duration_minutes < 45 else 4
-        for day_number in range(1, data.days_per_week + 1):
-            selected = [exercises[(day_number - 1 + offset) % len(exercises)] for offset in range(exercises_per_day)]
+        exercises_per_day = self._max_exercises_per_day(data.session_duration_minutes)
+        used_counts: dict[str, int] = {}
+        split = self._split_for(data.days_per_week, data.goal)
+        for day_number, focus in enumerate(split, start=1):
+            selected = self._select_exercises_for_focus(exercises, focus, exercises_per_day, used_counts, data.priorities)
+            for exercise in selected:
+                used_counts[str(exercise.id)] = used_counts.get(str(exercise.id), 0) + 1
             routines.append(
                 {
                     "day": day_number,
-                    "name": f"Plan IA Dia {day_number}",
-                    "description": f"Rutina generada para objetivo {data.goal} y nivel {data.level}.",
+                    "name": f"{self._focus_label(focus)} Dia {day_number}",
+                    "focus": focus,
+                    "description": f"Sesion {self._focus_label(focus).lower()} para objetivo {data.goal} y nivel {data.level}.",
                     "exercises": [
                         {
                             "exercise_id": str(exercise.id),
                             "exercise_name": exercise.name,
-                            **prescription,
+                            **self._prescription_for(data.goal, data.level, self._exercise_category(exercise)),
+                            "reason": f"Seleccionado para cubrir {self._exercise_category(exercise)} dentro de una sesion {self._focus_label(focus).lower()}.",
                         }
                         for exercise in selected
                     ],
                 }
             )
-        return {"version": 1, "routines": routines, "progression": "Revisa el rendimiento cada 2-3 sesiones antes de subir carga."}
+        return {"version": 2, "routines": routines, "progression": "Revisa rendimiento y tecnica cada 2-3 sesiones; sube carga solo si completas el rango con RIR suficiente."}
 
-    def _prescription_for(self, goal: str, level: str) -> dict:
+    def _max_exercises_per_day(self, session_duration_minutes: int) -> int:
+        if session_duration_minutes < 45:
+            return 3
+        if session_duration_minutes < 75:
+            return 4
+        if session_duration_minutes < 105:
+            return 5
+        return 6
+
+    def _split_for(self, days_per_week: int, goal: str) -> list[str]:
+        if days_per_week == 1:
+            return ["full_body"]
+        if days_per_week == 2:
+            return ["full_body_a", "full_body_b"]
+        if days_per_week == 3:
+            return ["push", "pull", "legs"] if goal in {"hypertrophy", "strength"} else ["full_body_a", "full_body_b", "full_body_c"]
+        if days_per_week == 4:
+            return ["upper", "lower", "upper", "lower"]
+        if days_per_week == 5:
+            return ["push", "pull", "legs", "upper", "lower"]
+        if days_per_week == 6:
+            return ["push", "pull", "legs", "push", "pull", "legs"]
+        return ["push", "pull", "legs", "upper", "lower", "full_body", "recovery"]
+
+    def _select_exercises_for_focus(
+        self,
+        exercises: list[Exercise],
+        focus: str,
+        limit: int,
+        used_counts: dict[str, int],
+        priorities: list[str],
+    ) -> list[Exercise]:
+        desired = self._desired_categories(focus)
+        selected: list[Exercise] = []
+        for category in desired:
+            candidate = self._best_candidate(exercises, category, selected, used_counts, priorities)
+            if candidate is not None:
+                selected.append(candidate)
+            if len(selected) >= limit:
+                return selected
+
+        for exercise in sorted(exercises, key=lambda item: (used_counts.get(str(item.id), 0), item.name)):
+            if exercise not in selected:
+                selected.append(exercise)
+            if len(selected) >= limit:
+                break
+        return selected
+
+    def _desired_categories(self, focus: str) -> list[str]:
+        if focus.startswith("full_body"):
+            return ["legs", "push", "pull", "core", "accessory"]
+        if focus == "upper":
+            return ["push", "pull", "shoulders", "arms", "core"]
+        if focus == "lower":
+            return ["legs", "hinge", "glutes", "calves", "core"]
+        if focus == "push":
+            return ["push", "shoulders", "triceps", "push", "core"]
+        if focus == "pull":
+            return ["pull", "pull", "biceps", "hinge", "core"]
+        if focus == "legs":
+            return ["legs", "hinge", "glutes", "calves", "core"]
+        if focus == "recovery":
+            return ["core", "accessory", "pull"]
+        return ["push", "pull", "legs", "core"]
+
+    def _best_candidate(
+        self,
+        exercises: list[Exercise],
+        category: str,
+        selected: list[Exercise],
+        used_counts: dict[str, int],
+        priorities: list[str],
+    ) -> Exercise | None:
+        selected_ids = {exercise.id for exercise in selected}
+        candidates = [exercise for exercise in exercises if exercise.id not in selected_ids and self._matches_category(exercise, category)]
+        if not candidates:
+            return None
+        normalized_priorities = [self._normalize(priority) for priority in priorities]
+        return sorted(
+            candidates,
+            key=lambda exercise: (
+                used_counts.get(str(exercise.id), 0),
+                -self._priority_score(exercise, normalized_priorities),
+                exercise.difficulty == "advanced",
+                exercise.name,
+            ),
+        )[0]
+
+    def _matches_category(self, exercise: Exercise, category: str) -> bool:
+        exercise_category = self._exercise_category(exercise)
+        if category == exercise_category:
+            return True
+        if category == "accessory" and exercise_category in {"arms", "shoulders", "calves", "core"}:
+            return True
+        if category == "glutes" and exercise_category in {"legs", "hinge"}:
+            return "glute" in self._exercise_text(exercise)
+        return False
+
+    def _exercise_category(self, exercise: Exercise) -> str:
+        text = self._exercise_text(exercise)
+        if any(marker in text for marker in ["core", "abdominal", "oblicuo", "plancha"]):
+            return "core"
+        if any(marker in text for marker in ["gemelo", "calf"]):
+            return "calves"
+        if any(marker in text for marker in ["biceps", "triceps", "curl"]):
+            return "arms"
+        if any(marker in text for marker in ["hombro", "deltoide", "elevacion lateral", "press militar"]):
+            return "shoulders"
+        if any(marker in text for marker in ["peso muerto", "hip thrust", "curl femoral", "isquio", "bisagra", "lumbar"]):
+            return "hinge"
+        if any(marker in text for marker in ["pierna", "cuadriceps", "sentadilla", "prensa", "zancada", "gluteo"]):
+            return "legs"
+        if any(marker in text for marker in ["espalda", "dorsal", "remo", "dominada", "jalon"]):
+            return "pull"
+        if any(marker in text for marker in ["pecho", "press", "flexion", "fondos"]):
+            return "push"
+        return "accessory"
+
+    def _exercise_text(self, exercise: Exercise) -> str:
+        return self._normalize(" ".join([exercise.name, *(muscle.name for muscle in exercise.muscle_groups)]))
+
+    def _priority_score(self, exercise: Exercise, normalized_priorities: list[str]) -> int:
+        text = self._exercise_text(exercise)
+        return sum(1 for priority in normalized_priorities if priority and priority in text)
+
+    def _focus_label(self, focus: str) -> str:
+        labels = {
+            "full_body": "Full body",
+            "full_body_a": "Full body A",
+            "full_body_b": "Full body B",
+            "full_body_c": "Full body C",
+            "upper": "Tren superior",
+            "lower": "Tren inferior",
+            "push": "Empuje",
+            "pull": "Tiron",
+            "legs": "Pierna",
+            "recovery": "Recuperacion activa",
+        }
+        return labels.get(focus, "Sesion")
+
+    def _normalize(self, value: str) -> str:
+        return unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode().lower()
+
+    def _prescription_for(self, goal: str, level: str, category: str = "accessory") -> dict:
         if goal == "strength":
             base = {"target_sets": 4, "target_reps_min": 3, "target_reps_max": 6, "rest_seconds": 180, "target_rpe": "8", "target_rir": 2}
+            if category in {"arms", "shoulders", "calves", "core", "accessory"}:
+                base = {**base, "target_sets": 3, "target_reps_min": 8, "target_reps_max": 12, "rest_seconds": 90}
         elif goal == "endurance":
             base = {"target_sets": 2, "target_reps_min": 12, "target_reps_max": 20, "rest_seconds": 60, "target_rpe": "7", "target_rir": 3}
+        elif goal == "general_health":
+            base = {"target_sets": 2, "target_reps_min": 8, "target_reps_max": 15, "rest_seconds": 75, "target_rpe": "7", "target_rir": 3}
         else:
             base = {"target_sets": 3, "target_reps_min": 8, "target_reps_max": 12, "rest_seconds": 90, "target_rpe": "8", "target_rir": 2}
+            if category in {"arms", "shoulders", "calves", "core", "accessory"}:
+                base = {**base, "target_reps_min": 10, "target_reps_max": 15, "rest_seconds": 75}
         if level == "beginner":
             base = {**base, "target_sets": max(2, base["target_sets"] - 1)}
         if level == "advanced":

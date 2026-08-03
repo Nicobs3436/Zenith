@@ -47,8 +47,8 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - Rangos actuales: score por volumen con peso, mejora de 1RM estimado y amplitud de ejercicios progresados; sin puntos por sesiones ni semanas activas.
 - Soft delete actual: borrar rutina no borra sesiones historicas; borrar sesion la excluye de historial, estadisticas y rango.
 - Anotaciones por sesion y por ejercicio.
-- IA actual sugiere sobrecarga progresiva, deload inteligente, cambios de ejercicio, ajustes de volumen/reps/descanso, analisis de objetivo por rutina y estancamiento; Ollama solo enriquece textos/riesgo/confianza; solo modifica rutinas al aceptar una sugerencia o un plan adaptativo.
-- El entrenador personal puede crear planes adaptativos; al aceptar crea rutinas reales, no sesiones.
+- IA actual sugiere sobrecarga progresiva, deload inteligente, cambios de ejercicio, ajustes de volumen/reps/descanso, analisis de objetivo por rutina y estancamiento; en planes adaptativos Ollama puede proponer la estructura completa usando el catalogo accesible y backend valida antes de guardar; solo modifica rutinas al aceptar una sugerencia o un plan adaptativo.
+- El entrenador personal puede crear planes adaptativos; con Ollama local la IA propone la estructura y el backend valida ids, volumen, rangos, coherencia y privacidad; al aceptar crea rutinas reales, no sesiones.
 - Los resumenes post-sesion generan resumen, mejoras, caidas, warnings y proxima recomendacion; no modifican rutinas, sesiones ni series.
 - Las preguntas guiadas al entrenador no se persisten, no crean sugerencias y no modifican rutinas, sesiones, series ni planes; el texto libre de detalle no se envia a proveedores.
 

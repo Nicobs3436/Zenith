@@ -77,6 +77,42 @@ def plan_payload(**overrides) -> dict:
     }
 
 
+def ollama_plan_response(exercises: list[Exercise], *, explanation: str = "Plan creado por Ollama", days: int = 3) -> bytes:
+    routines = []
+    for day in range(1, days + 1):
+        selected = [exercises[(day - 1) % len(exercises)], exercises[day % len(exercises)]]
+        routines.append(
+            {
+                "day": day,
+                "name": f"Dia IA {day}",
+                "focus": "full_body",
+                "description": "Sesion generada por IA.",
+                "exercises": [
+                    {
+                        "exercise_id": str(exercise.id),
+                        "exercise_name": exercise.name,
+                        "target_sets": 2,
+                        "target_reps_min": 8,
+                        "target_reps_max": 12,
+                        "target_rpe": "7",
+                        "target_rir": 3,
+                        "rest_seconds": 90,
+                        "reason": "Seleccionado por la IA para equilibrar la sesion.",
+                    }
+                    for exercise in selected
+                ],
+            }
+        )
+    payload = {
+        "routines": routines,
+        "progression": "Progresa cuando completes el rango con buena tecnica.",
+        "explanation": explanation,
+        "risk_notes": "Riesgo enriquecido",
+        "confidence": "high",
+    }
+    return json.dumps({"response": json.dumps(payload)}).encode("utf-8")
+
+
 def test_generate_training_plan_creates_draft_with_one_routine_per_day(
     client_with_db: tuple[TestClient, SessionFactory],
 ) -> None:
@@ -106,6 +142,25 @@ def test_generate_training_plan_creates_draft_with_one_routine_per_day(
         "external_data_sent": False,
         "fallback_used": False,
     }
+
+
+def test_internal_training_plan_does_not_repeat_same_exercises_every_day(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
+    client, session_factory = client_with_db
+    seed_exercises(session_factory, count=8)
+    token = register_and_login(client, "varied@example.com", "varied_user")
+
+    response = client.post(
+        "/ai/training-plans/generate",
+        headers={"Authorization": f"Bearer {token}"},
+        json=plan_payload(days_per_week=4),
+    )
+
+    assert response.status_code == 201
+    routines = response.json()["plan_payload"]["routines"]
+    exercise_sets = [tuple(exercise["exercise_id"] for exercise in routine["exercises"]) for routine in routines]
+    assert len(set(exercise_sets)) > 1
 
 
 def test_generate_training_plan_requires_acknowledgement_for_physical_limitations(
@@ -169,9 +224,11 @@ def test_generate_training_plan_treats_blank_limitations_as_absent(
     assert data["input_summary"]["privacy"]["physical_limitations_included"] is False
 
 
-def test_ollama_provider_enriches_training_plan_text_without_changing_payload(
+def test_ollama_provider_generates_training_plan_structure(
     client_with_db: tuple[TestClient, SessionFactory], monkeypatch
 ) -> None:
+    response_body = b""
+
     class FakeResponse:
         def __enter__(self):
             return self
@@ -180,11 +237,7 @@ def test_ollama_provider_enriches_training_plan_text_without_changing_payload(
             return False
 
         def read(self):
-            return (
-                b'{"response": "{\\"explanation\\": \\"Plan enriquecido por Ollama\\", '
-                b'\\"risk_notes\\": \\"Riesgo enriquecido\\", '
-                b'\\"confidence\\": \\"high\\"}"}'
-            )
+            return response_body
 
     captured_body = {}
 
@@ -198,7 +251,8 @@ def test_ollama_provider_enriches_training_plan_text_without_changing_payload(
     get_settings.cache_clear()
     monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
     client, session_factory = client_with_db
-    seed_exercises(session_factory)
+    exercises = seed_exercises(session_factory)
+    response_body = ollama_plan_response(exercises, explanation="Plan estructurado por Ollama")
     token = register_and_login(client, "owner@example.com", "owner_user")
 
     response = client.post(
@@ -210,17 +264,19 @@ def test_ollama_provider_enriches_training_plan_text_without_changing_payload(
     get_settings.cache_clear()
     assert response.status_code == 201
     data = response.json()
-    assert data["explanation"] == "Plan enriquecido por Ollama"
+    assert data["explanation"] == "Plan estructurado por Ollama"
     assert data["risk_notes"] == "Riesgo enriquecido"
     assert data["confidence"] == "high"
     assert data["provider"] == "ollama"
     assert data["model"] == "llama3.2"
     assert data["fallback_used"] is False
     assert len(data["plan_payload"]["routines"]) == 3
+    assert data["plan_payload"]["routines"][0]["name"] == "Dia IA 1"
     assert data["input_summary"]["ai_provider"]["provider"] == "ollama"
     assert data["input_summary"]["ai_provider"]["fallback_used"] is False
-    assert "Molestia privada de rodilla" not in captured_body["body"]
-    assert "exercise_id" not in captured_body["body"]
+    assert "Molestia privada de rodilla" in captured_body["body"]
+    assert "exercise_catalog" in captured_body["body"]
+    assert "exercise_id" in captured_body["body"]
     assert "owner@example.com" not in captured_body["body"]
 
 
@@ -382,6 +438,8 @@ def test_modify_training_plan_creates_new_draft_and_keeps_original(
 def test_modify_training_plan_uses_configured_provider(
     client_with_db: tuple[TestClient, SessionFactory], monkeypatch
 ) -> None:
+    response_body = b""
+
     class FakeResponse:
         def __enter__(self):
             return self
@@ -390,17 +448,14 @@ def test_modify_training_plan_uses_configured_provider(
             return False
 
         def read(self):
-            return (
-                b'{"response": "{\\"explanation\\": \\"Version ajustada por Ollama\\", '
-                b'\\"risk_notes\\": null, '
-                b'\\"confidence\\": \\"medium\\"}"}'
-            )
+            return response_body
 
     monkeypatch.setenv("APP_AI_PROVIDER", "ollama")
     get_settings.cache_clear()
     monkeypatch.setattr("app.application.ai_provider.urlopen", lambda _request, timeout: FakeResponse())
     client, session_factory = client_with_db
-    seed_exercises(session_factory)
+    exercises = seed_exercises(session_factory)
+    response_body = ollama_plan_response(exercises, explanation="Version ajustada por Ollama")
     token = register_and_login(client, "owner@example.com", "owner_user")
     original = client.post(
         "/ai/training-plans/generate",

@@ -93,12 +93,12 @@ Aplicacion movil/web para gestionar rutinas de gimnasio, registrar sesiones, con
 - Genera sugerencias trazables para subir peso, bajar volumen, cambiar reps, aumentar descanso o detectar estancamiento.
 - Evita duplicar sugerencias pendientes identicas y expira sugerencias pendientes obsoletas al generar un nuevo analisis.
 - Guarda regla disparada, metricas resumidas y cambio aplicable en la trazabilidad.
-- Ollama solo puede enriquecer recomendacion, explicacion, notas de riesgo y confianza.
+- En sugerencias, resumenes y preguntas, Ollama enriquece textos/listas bajo validacion; en planes adaptativos puede proponer estructura completa validada por backend.
 - Si Ollama falla o devuelve JSON invalido, se usa fallback interno y se traza.
 - Generar una sugerencia no modifica datos.
 - Aceptar una sugerencia aplica un cambio validado sobre la rutina; rechazar solo cambia el estado.
 - Las sesiones historicas no se modifican.
-- El entrenador personal genera planes adaptativos con una rutina por dia disponible; aceptar crea rutinas reales, rechazar no modifica datos. Ollama local opcional solo enriquece textos del plan y el backend valida la estructura antes de persistirla.
+- El entrenador personal genera planes adaptativos con una rutina por dia disponible; aceptar crea rutinas reales, rechazar no modifica datos. Con Ollama local, la IA puede proponer la estructura completa del plan usando el catalogo accesible; el backend valida ejercicios, volumen, rangos, coherencia, privacidad y usa fallback interno si la propuesta no es valida.
 - El resumen post-sesion analiza solo datos estructurados de una sesion activa propia; excluye notas y no modifica datos historicos.
 - Las preguntas guiadas al entrenador (`next_workout`, `progression`, `fatigue`, `routine_review`, `stats_explanation`) responden sin persistir historial, sin chat libre y sin modificar datos.
 - En preguntas guiadas, el detalle libre no se envia a proveedores ni se incluye en `input_summary`; solo se usa contexto estructurado propio.

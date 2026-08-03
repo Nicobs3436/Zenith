@@ -141,7 +141,7 @@ API FastAPI para la gestion de rutinas de gimnasio, registros de entrenamiento y
 - Aceptar un cambio de ejercicio reemplaza el ejercicio planificado en la rutina; no toca sesiones historicas.
 - Aceptar un plan adaptativo crea rutinas reales, una por dia disponible.
 - Modificar un plan adaptativo crea una nueva version `draft` con trazabilidad; no cambia el original ni crea rutinas.
-- En planes adaptativos, Ollama solo enriquece explicacion, notas de riesgo y confianza; la estructura se genera y valida en backend antes de guardar.
+- En planes adaptativos, Ollama puede generar la estructura completa del plan usando el catalogo accesible de ejercicios; el backend valida ids, volumen, rangos, coherencia y privacidad antes de guardar.
 - Los resumenes post-sesion devuelven resumen, mejoras, caidas, warnings y proxima recomendacion; no modifican rutinas ni sesiones.
 - Las preguntas guiadas al entrenador responden `next_workout`, `progression`, `fatigue`, `routine_review` y `stats_explanation`; no se persisten, no crean sugerencias y no aplican cambios.
 - En preguntas guiadas, el detalle libre no se envia a Ollama ni se incluye en trazabilidad; solo se usa contexto estructurado propio.
@@ -155,3 +155,4 @@ API FastAPI para la gestion de rutinas de gimnasio, registros de entrenamiento y
 - Descargar modelo: `ollama pull llama3.2`.
 - Arrancar servicio: `ollama serve`.
 - Configurar `.env`: `APP_AI_PROVIDER=ollama`.
+- Para planes personalizados, Ollama recibe objetivo, nivel, dias, duracion, equipamiento, prioridades, catalogo estructurado de ejercicios accesibles y limitaciones fisicas solo si fueron confirmadas como dato sensible.

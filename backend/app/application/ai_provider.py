@@ -49,10 +49,25 @@ class AiTrainingPlanProviderContext:
     base_explanation: str
     base_risk_notes: str | None
     modification_instruction: str | None = None
+    exercise_catalog: list[dict[str, Any]] | None = None
+    physical_limitations: str | None = None
+    validation_errors: list[str] | None = None
 
 
 @dataclass(frozen=True)
 class AiTrainingPlanProviderResult:
+    explanation: str
+    risk_notes: str | None
+    confidence: str
+    provider: str
+    model: str | None
+    external_data_sent: bool
+    fallback_used: bool = False
+
+
+@dataclass(frozen=True)
+class AiTrainingPlanStructureProviderResult:
+    plan_payload: dict[str, Any]
     explanation: str
     risk_notes: str | None
     confidence: str
@@ -224,6 +239,33 @@ class OllamaAiProvider:
 
         return self._parse_training_plan_response(model_response)
 
+    def build_training_plan_structure(self, context: AiTrainingPlanProviderContext) -> AiTrainingPlanStructureProviderResult:
+        payload = {
+            "model": self.model,
+            "stream": False,
+            "format": "json",
+            "prompt": self._training_plan_structure_prompt(context),
+        }
+        request = Request(
+            f"{self.base_url}/api/generate",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.timeout_seconds) as response:
+                raw = response.read().decode("utf-8")
+        except (OSError, URLError) as error:
+            raise AiProviderError("Ollama request failed.") from error
+
+        try:
+            parsed = json.loads(raw)
+            model_response = json.loads(parsed.get("response", ""))
+        except (TypeError, ValueError) as error:
+            raise AiProviderError("Ollama returned invalid JSON.") from error
+
+        return self._parse_training_plan_structure_response(model_response)
+
     def build_session_summary_text(self, context: AiSessionSummaryProviderContext) -> AiSessionSummaryProviderResult:
         payload = {
             "model": self.model,
@@ -320,6 +362,36 @@ class OllamaAiProvider:
             f"{json.dumps(safe_context, ensure_ascii=False)}"
         )
 
+    def _training_plan_structure_prompt(self, context: AiTrainingPlanProviderContext) -> str:
+        safe_context = {
+            "goal": context.goal,
+            "level": context.level,
+            "days_per_week": context.days_per_week,
+            "session_duration_minutes": context.session_duration_minutes,
+            "available_equipment": context.available_equipment,
+            "priorities": context.priorities,
+            "physical_limitations": context.physical_limitations,
+            "modification_instruction": context.modification_instruction,
+            "validation_errors_to_fix": context.validation_errors or [],
+            "exercise_catalog": context.exercise_catalog or [],
+        }
+        return (
+            "Eres un entrenador personal de fuerza e hipertrofia. Crea un plan semanal personalizado y seguro. "
+            "Usa SOLO exercise_id del exercise_catalog. No inventes ejercicios ni ids. "
+            "Respeta dias_por_semana, duracion, nivel, objetivo, equipamiento, prioridades y limitaciones fisicas si existen. "
+            "Programa con criterio: split coherente, compuestos antes que accesorios, volumen razonable, descanso suficiente, "
+            "evita repetir exactamente los mismos ejercicios todos los dias y evita sesiones redundantes. "
+            "No incluyas diagnosticos medicos ni promesas absolutas. Devuelve solo JSON valido con keys: "
+            "routines, progression, explanation, risk_notes, confidence. "
+            "confidence debe ser low, medium o high. routines debe tener exactamente days_per_week elementos. "
+            "Cada routine debe tener: day, name, focus, description, exercises. "
+            "Cada exercise debe tener: exercise_id, exercise_name, target_sets, target_reps_min, target_reps_max, "
+            "target_rpe, target_rir, rest_seconds, reason. "
+            "Rangos seguros: target_sets 1-8, reps 1-30, target_rpe 6-9, target_rir 0-4, rest_seconds 45-300. "
+            "Contexto estructurado: "
+            f"{json.dumps(safe_context, ensure_ascii=False)}"
+        )
+
     def _session_summary_prompt(self, context: AiSessionSummaryProviderContext) -> str:
         safe_context = {
             "input_summary": context.input_summary,
@@ -382,6 +454,28 @@ class OllamaAiProvider:
         if confidence not in VALID_CONFIDENCE:
             raise AiProviderError("Ollama confidence is invalid.")
         return AiTrainingPlanProviderResult(
+            explanation=explanation,
+            risk_notes=risk_notes,
+            confidence=confidence,
+            provider=self.provider,
+            model=self.model,
+            external_data_sent=self.external_data_sent,
+        )
+
+    def _parse_training_plan_structure_response(self, data: Any) -> AiTrainingPlanStructureProviderResult:
+        if not isinstance(data, dict):
+            raise AiProviderError("Ollama response is not an object.")
+        routines = data.get("routines")
+        if not isinstance(routines, list):
+            raise AiProviderError("Ollama training plan routines are invalid.")
+        progression = self._text(data.get("progression"))
+        explanation = self._text(data.get("explanation"))
+        risk_notes = self._text(data.get("risk_notes"), required=False)
+        confidence = self._text(data.get("confidence"))
+        if confidence not in VALID_CONFIDENCE:
+            raise AiProviderError("Ollama confidence is invalid.")
+        return AiTrainingPlanStructureProviderResult(
+            plan_payload={"version": 2, "routines": routines, "progression": progression},
             explanation=explanation,
             risk_notes=risk_notes,
             confidence=confidence,
