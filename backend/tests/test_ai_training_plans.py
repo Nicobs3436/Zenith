@@ -301,6 +301,8 @@ def test_groq_provider_generates_training_plan_structure(
         captured["url"] = request.full_url
         captured["body"] = request.data.decode("utf-8")
         captured["authorization"] = request.get_header("Authorization")
+        captured["accept"] = request.get_header("Accept")
+        captured["user_agent"] = request.get_header("User-agent")
         captured["timeout"] = timeout
         return FakeResponse()
 
@@ -330,6 +332,8 @@ def test_groq_provider_generates_training_plan_structure(
     assert data["input_summary"]["ai_provider"]["external_data_sent"] is True
     assert captured["url"] == "https://api.groq.com/openai/v1/chat/completions"
     assert captured["authorization"] == "Bearer test-groq-key"
+    assert captured["accept"] == "application/json"
+    assert captured["user_agent"] == "ZenithCoach/1.0"
     assert "response_format" in captured["body"]
     assert "groq-owner@example.com" not in captured["body"]
 
