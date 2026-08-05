@@ -101,44 +101,29 @@ class AiSessionSummaryProviderResult:
 
 
 @dataclass(frozen=True)
-class AiCoachQuestionProviderContext:
-    question_type: str
-    input_summary: dict[str, Any]
-    answer: str
-    key_points: list[str]
-    suggested_actions: list[str]
-
-
-@dataclass(frozen=True)
-class AiCoachQuestionProviderResult:
-    answer: str
-    key_points: list[str]
-    suggested_actions: list[str]
-    provider: str
-    model: str | None
-    external_data_sent: bool
-    fallback_used: bool = False
-
-
-@dataclass(frozen=True)
-class AiCoachIntakeProviderContext:
-    intake_summary: dict[str, Any]
+class CoachInterviewProviderContext:
+    profile: dict[str, Any]
+    interview_state: dict[str, Any]
     recent_messages: list[dict[str, Any]]
     user_message: str | None
-    missing_required_fields: list[str]
-    useful_missing_fields: list[str]
+    personal_data_acknowledged: bool
     sensitive_data_acknowledged: bool
+    missing_critical: list[str]
+    missing_useful: list[str]
 
 
 @dataclass(frozen=True)
-class AiCoachIntakeProviderResult:
+class CoachInterviewProviderResult:
     assistant_message: str
-    extracted_fields: dict[str, Any]
-    missing_required_fields: list[str]
-    useful_missing_fields: list[str]
+    profile_updates: dict[str, Any]
+    known_facts: list[str]
+    missing_critical: list[str]
+    missing_useful: list[str]
     estimated_fields: list[str]
+    misunderstanding_corrections: list[str]
+    safety_flags: list[str]
     ready_for_plan: bool
-    safety_warning: str | None
+    next_questions: list[str]
     provider: str
     model: str | None
     external_data_sent: bool
@@ -183,39 +168,22 @@ class InternalAiProvider:
             external_data_sent=self.external_data_sent,
         )
 
-    def build_coach_question_text(self, context: AiCoachQuestionProviderContext) -> AiCoachQuestionProviderResult:
-        return AiCoachQuestionProviderResult(
-            answer=context.answer,
-            key_points=context.key_points,
-            suggested_actions=context.suggested_actions,
-            provider=self.provider,
-            model=self.model,
-            external_data_sent=self.external_data_sent,
-        )
-
-    def build_coach_intake_response(self, context: AiCoachIntakeProviderContext) -> AiCoachIntakeProviderResult:
-        missing = context.missing_required_fields
-        useful = context.useful_missing_fields
+    def build_coach_interview_response(self, context: CoachInterviewProviderContext) -> CoachInterviewProviderResult:
+        missing = context.missing_critical
+        question = "Cuéntame tu objetivo, experiencia, disponibilidad, equipo y cualquier preferencia importante."
         if missing:
-            next_field = missing[0]
-            question = {
-                "goal": "Para ajustar el plan, dime tu objetivo principal: fuerza, hipertrofia, perdida de grasa, salud general o resistencia.",
-                "level": "Cual es tu nivel actual: principiante, intermedio o avanzado?",
-                "days_per_week": "Cuantos dias por semana puedes entrenar de forma realista?",
-                "session_duration_minutes": "Cuantos minutos tienes por sesion?",
-            }.get(next_field, "Dame un poco mas de contexto para completar tu plan.")
-        elif useful:
-            question = "Ya tengo lo imprescindible. Si quieres afinarlo, dime equipamiento disponible, prioridades musculares o limitaciones fisicas. Si no, puedo generar el plan."
-        else:
-            question = "Tengo suficiente informacion para crear un borrador de plan. Revisalo antes de aceptarlo."
-        return AiCoachIntakeProviderResult(
+            question = "Para empezar bien necesito algunos datos: objetivo, edad/sexo, altura/peso, nivel, dias, duracion y equipamiento."
+        return CoachInterviewProviderResult(
             assistant_message=question,
-            extracted_fields={},
-            missing_required_fields=missing,
-            useful_missing_fields=useful,
-            estimated_fields=[],
+            profile_updates={},
+            known_facts=list(context.interview_state.get("known_facts") or []),
+            missing_critical=missing,
+            missing_useful=context.missing_useful,
+            estimated_fields=list(context.interview_state.get("estimated_fields") or []),
+            misunderstanding_corrections=[],
+            safety_flags=[],
             ready_for_plan=not missing,
-            safety_warning=self._intake_safety_warning(context.sensitive_data_acknowledged),
+            next_questions=[question],
             provider=self.provider,
             model=self.model,
             external_data_sent=self.external_data_sent,
@@ -227,12 +195,6 @@ class InternalAiProvider:
         if suggestion_type in {"reduce_volume", "change_reps", "deload_recommended", "exercise_swap", "routine_goal_adjustment"}:
             return "medium"
         return "low"
-
-    def _intake_safety_warning(self, sensitive_data_acknowledged: bool) -> str | None:
-        if sensitive_data_acknowledged:
-            return "Las limitaciones indicadas sirven solo para adaptar el plan; no sustituyen consejo medico o profesional."
-        return None
-
 
 class OllamaAiProvider:
     provider = "ollama"
@@ -351,12 +313,12 @@ class OllamaAiProvider:
 
         return self._parse_session_summary_response(model_response)
 
-    def build_coach_question_text(self, context: AiCoachQuestionProviderContext) -> AiCoachQuestionProviderResult:
+    def build_coach_interview_response(self, context: CoachInterviewProviderContext) -> CoachInterviewProviderResult:
         payload = {
             "model": self.model,
             "stream": False,
             "format": "json",
-            "prompt": self._coach_question_prompt(context),
+            "prompt": self._coach_interview_prompt(context),
         }
         request = Request(
             f"{self.base_url}/api/generate",
@@ -376,34 +338,7 @@ class OllamaAiProvider:
         except (TypeError, ValueError) as error:
             raise AiProviderError("Ollama returned invalid JSON.") from error
 
-        return self._parse_coach_question_response(model_response)
-
-    def build_coach_intake_response(self, context: AiCoachIntakeProviderContext) -> AiCoachIntakeProviderResult:
-        payload = {
-            "model": self.model,
-            "stream": False,
-            "format": "json",
-            "prompt": self._coach_intake_prompt(context),
-        }
-        request = Request(
-            f"{self.base_url}/api/generate",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=self.timeout_seconds) as response:
-                raw = response.read().decode("utf-8")
-        except (OSError, URLError) as error:
-            raise AiProviderError("Ollama request failed.") from error
-
-        try:
-            parsed = json.loads(raw)
-            model_response = json.loads(parsed.get("response", ""))
-        except (TypeError, ValueError) as error:
-            raise AiProviderError("Ollama returned invalid JSON.") from error
-
-        return self._parse_coach_intake_response(model_response)
+        return self._parse_coach_interview_response(model_response)
 
     def _prompt(self, context: AiProviderContext) -> str:
         safe_context = {
@@ -463,7 +398,7 @@ class OllamaAiProvider:
             "Eres el entrenador personal de Zenith. Disena el mejor programa posible para el usuario, sin limitarte a una base de datos de ejercicios. "
             "Devuelve SOLO JSON valido. No diagnostiques, no prometas resultados absolutos y no incluyas datos personales no aportados. "
             "El JSON debe ser plan_payload v3 y tener keys: version, generated_by, program_blueprint, coach_rationale, exercise_resolution, "
-            "weekly_schedule, volume_by_muscle, progression_model, routines, validation_report, acceptance_effects, explanation, risk_notes, confidence. "
+            "weekly_schedule, volume_by_muscle, progression_model, routines, validation_report, acceptance_effects, coach_report, explanation, risk_notes, confidence. "
             f"version debe ser 3. generated_by.provider debe ser {self.provider}. confidence debe ser low, medium o high. "
             "Primero disena la arquitectura del programa: split, volumen semanal por musculo, roles por dia y progresion. Luego elige ejercicios. "
             "No uses ejercicios que el usuario pidio evitar en priorities con formato 'evitar ...'. "
@@ -472,6 +407,10 @@ class OllamaAiProvider:
             "primary_muscle, secondary_muscles, target_sets, target_reps_min, target_reps_max, target_rpe, target_rir, rest_seconds, reason, progression_hint. "
             "Rangos seguros: target_sets 1-8, reps 1-30, target_rpe 6-9, target_rir 0-4, rest_seconds 45-300. "
             "Usa compuestos antes que accesorios, reparte volumen por semana, justifica cada ejercicio y declara que ejercicios nuevos se crearan solo al aceptar. "
+            "coach_report debe ser un informe profesional con keys: user_data_summary, assumptions, measurable_goals, split_justification, weekly_calendar, "
+            "training_tables_summary, progression_system, warmup, fatigue_and_deload, tracking_template, nutrition_and_recovery, substitutions, mistakes_to_avoid, "
+            "scientific_references, next_review_questions. scientific_references debe contener solo referencias reales conocidas y verificables; si no estas seguro, "
+            "indica evidencia no concluyente en vez de inventar autores, DOI, PMID o enlaces. Distingue evidence_level solid, moderate o practical. "
             "Contexto estructurado: "
             f"{json.dumps(safe_context, ensure_ascii=False)}"
         )
@@ -494,43 +433,68 @@ class OllamaAiProvider:
             f"{json.dumps(safe_context, ensure_ascii=False)}"
         )
 
-    def _coach_question_prompt(self, context: AiCoachQuestionProviderContext) -> str:
+    def _coach_interview_prompt(self, context: CoachInterviewProviderContext) -> str:
         safe_context = {
-            "question_type": context.question_type,
-            "input_summary": context.input_summary,
-            "base_answer": context.answer,
-            "base_key_points": context.key_points,
-            "base_suggested_actions": context.suggested_actions,
-        }
-        return (
-            "Eres un entrenador de fuerza. Devuelve solo JSON valido con keys: "
-            "answer, key_points, suggested_actions. key_points y suggested_actions deben ser arrays de strings. "
-            "Responde solo la pregunta guiada, no apliques cambios ni digas que modificaste rutinas o sesiones. "
-            "No menciones datos personales, notas privadas, diagnosticos ni datos medicos. Contexto estructurado: "
-            f"{json.dumps(safe_context, ensure_ascii=False)}"
-        )
-
-    def _coach_intake_prompt(self, context: AiCoachIntakeProviderContext) -> str:
-        safe_context = {
-            "intake_summary": context.intake_summary,
-            "recent_messages": context.recent_messages[-4:],
+            "profile": context.profile,
+            "interview_state": context.interview_state,
+            "recent_messages": context.recent_messages[-10:],
             "latest_user_message": context.user_message,
-            "missing_required_fields": context.missing_required_fields,
-            "useful_missing_fields": context.useful_missing_fields,
+            "personal_data_acknowledged": context.personal_data_acknowledged,
             "sensitive_data_acknowledged": context.sensitive_data_acknowledged,
+            "missing_critical": context.missing_critical,
+            "missing_useful": context.missing_useful,
         }
+        allowed_updates = [
+            "goal",
+            "secondary_goal",
+            "biological_sex",
+            "age",
+            "height_cm",
+            "weight_kg",
+            "experience_level",
+            "training_age_months",
+            "days_per_week",
+            "session_duration_minutes",
+            "equipment",
+            "priorities",
+            "preferred_exercises",
+            "avoided_exercises",
+            "physical_limitations",
+            "sleep_quality",
+            "stress_level",
+            "current_fatigue",
+            "available_weekdays",
+            "training_location",
+            "current_routine",
+            "recent_results",
+            "main_lifts",
+            "lagging_muscles",
+            "well_developed_muscles",
+            "nutrition_current",
+            "willing_to_track_nutrition",
+            "timeline_goal",
+            "weeks_with_limited_training",
+            "tracking_method",
+            "body_fat_percent",
+        ]
         return (
-            "Eres el entrenador personal de Zenith. Haz una entrevista inicial por bloques manejables. "
-            "No generes un plan todavia: solo recopila datos, resume campos y pregunta lo siguiente. "
-            "No inventes fuentes, diagnosticos, datos personales ni promesas absolutas. "
-            "Si faltan campos obligatorios, pregunta solo por el mas importante. "
-            "Si hay datos suficientes, marca ready_for_plan=true e invita a generar un borrador revisable. "
-            "Devuelve solo JSON valido con keys: assistant_message, extracted_fields, missing_required_fields, "
-            "useful_missing_fields, estimated_fields, ready_for_plan, safety_warning. "
-            "extracted_fields solo puede incluir: goal, level, days_per_week, session_duration_minutes, "
-            "available_equipment, priorities, physical_limitations. goal debe ser strength, hypertrophy, fat_loss, "
-            "general_health o endurance. level debe ser beginner, intermediate o advanced. "
-            "No incluyas physical_limitations si sensitive_data_acknowledged=false. Contexto estructurado: "
+            "Actua como un equipo multidisciplinar: especialista en ciencias del deporte, entrenador de hipertrofia/fuerza, "
+            "experto en biomecanica, fisiologia, recuperacion y prevencion de lesiones, e investigador critico. "
+            "Tu tarea ahora es SOLO entrevistar. No generes programa ni tablas de entrenamiento hasta que ready_for_plan sea true y el usuario pida la vista previa. "
+            "Conversa de forma natural, profesional y clara. Pregunta por bloques manejables, no por campos sueltos. No repitas datos ya conocidos. "
+            "Corrige malentendidos si el usuario aclara algo. Distingue datos imprescindibles, utiles y estimables. "
+            "Si hay dolor, lesion, limitacion o antecedente medico, no diagnostiques; recomienda valoracion sanitaria si hay dolor agudo, creciente, persistente o sintomas preocupantes. "
+            "No guardes ni devuelvas physical_limitations si sensitive_data_acknowledged=false; en ese caso pide confirmacion del aviso medico antes de tratar esos datos. "
+            "No incluyas email, username, tokens, credenciales, notas privadas ni historial completo. "
+            "Devuelve SOLO JSON valido con keys: assistant_message, profile_updates, known_facts, missing_critical, missing_useful, "
+            "estimated_fields, misunderstanding_corrections, safety_flags, ready_for_plan, next_questions. "
+            "profile_updates solo puede incluir estas keys: "
+            f"{json.dumps(allowed_updates, ensure_ascii=False)}. "
+            "missing_critical debe contener solo datos imprescindibles que falten para disenar un plan inicial seguro: "
+            "goal, biological_sex, age, height_cm, weight_kg, experience_level, days_per_week, session_duration_minutes, equipment. "
+            "Bloques de entrevista: 1 datos personales/objetivo; 2 experiencia/rutina/resultados/marcas; 3 disponibilidad/dias/duracion/lugar; "
+            "4 equipamiento; 5 preferencias/prioridades; 6 molestias/lesiones; 7 sueno/estres/actividad; 8 nutricion/objetivo temporal; 9 registro/seguimiento. "
+            "ready_for_plan solo puede ser true cuando no falte ningun dato imprescindible. Contexto estructurado: "
             f"{json.dumps(safe_context, ensure_ascii=False)}"
         )
 
@@ -622,32 +586,23 @@ class OllamaAiProvider:
             external_data_sent=self.external_data_sent,
         )
 
-    def _parse_coach_question_response(self, data: Any) -> AiCoachQuestionProviderResult:
+    def _parse_coach_interview_response(self, data: Any) -> CoachInterviewProviderResult:
         if not isinstance(data, dict):
-            raise AiProviderError("Ollama response is not an object.")
-        return AiCoachQuestionProviderResult(
-            answer=self._text(data.get("answer")) or "",
-            key_points=self._string_list(data.get("key_points")),
-            suggested_actions=self._string_list(data.get("suggested_actions")),
-            provider=self.provider,
-            model=self.model,
-            external_data_sent=self.external_data_sent,
-        )
-
-    def _parse_coach_intake_response(self, data: Any) -> AiCoachIntakeProviderResult:
-        if not isinstance(data, dict):
-            raise AiProviderError("Ollama response is not an object.")
-        extracted_fields = data.get("extracted_fields")
-        if not isinstance(extracted_fields, dict):
-            raise AiProviderError("Ollama extracted fields are invalid.")
-        return AiCoachIntakeProviderResult(
-            assistant_message=self._text(data.get("assistant_message")) or "",
-            extracted_fields=extracted_fields,
-            missing_required_fields=self._string_list(data.get("missing_required_fields")),
-            useful_missing_fields=self._string_list(data.get("useful_missing_fields")),
+            raise AiProviderError("Coach interview response is not an object.")
+        profile_updates = data.get("profile_updates")
+        if not isinstance(profile_updates, dict):
+            raise AiProviderError("Coach profile updates are invalid.")
+        return CoachInterviewProviderResult(
+            assistant_message=self._long_text(data.get("assistant_message")),
+            profile_updates=profile_updates,
+            known_facts=self._string_list(data.get("known_facts")),
+            missing_critical=self._string_list(data.get("missing_critical")),
+            missing_useful=self._string_list(data.get("missing_useful")),
             estimated_fields=self._string_list(data.get("estimated_fields")),
+            misunderstanding_corrections=self._string_list(data.get("misunderstanding_corrections")),
+            safety_flags=self._string_list(data.get("safety_flags")),
             ready_for_plan=bool(data.get("ready_for_plan")),
-            safety_warning=self._text(data.get("safety_warning"), required=False),
+            next_questions=self._string_list(data.get("next_questions")),
             provider=self.provider,
             model=self.model,
             external_data_sent=self.external_data_sent,
@@ -663,11 +618,21 @@ class OllamaAiProvider:
             raise AiProviderError("Ollama text field is empty.")
         return cleaned[:MAX_TEXT_LENGTH]
 
+    def _long_text(self, value: Any, *, required: bool = True) -> str | None:
+        if value is None and not required:
+            return None
+        if not isinstance(value, str):
+            raise AiProviderError("Ollama text field is invalid.")
+        cleaned = value.strip()
+        if not cleaned and required:
+            raise AiProviderError("Ollama text field is empty.")
+        return cleaned[:4_000]
+
     def _string_list(self, value: Any) -> list[str]:
         if not isinstance(value, list):
             raise AiProviderError("Ollama list field is invalid.")
         cleaned: list[str] = []
-        for item in value[:8]:
+        for item in value[:20]:
             if not isinstance(item, str):
                 raise AiProviderError("Ollama list item is invalid.")
             text = item.strip()
@@ -698,11 +663,8 @@ class GroqAiProvider(OllamaAiProvider):
     def build_session_summary_text(self, context: AiSessionSummaryProviderContext) -> AiSessionSummaryProviderResult:
         return self._parse_session_summary_response(self._chat_json(self._session_summary_prompt(context)))
 
-    def build_coach_question_text(self, context: AiCoachQuestionProviderContext) -> AiCoachQuestionProviderResult:
-        return self._parse_coach_question_response(self._chat_json(self._coach_question_prompt(context)))
-
-    def build_coach_intake_response(self, context: AiCoachIntakeProviderContext) -> AiCoachIntakeProviderResult:
-        return self._parse_coach_intake_response(self._chat_json(self._coach_intake_prompt(context)))
+    def build_coach_interview_response(self, context: CoachInterviewProviderContext) -> CoachInterviewProviderResult:
+        return self._parse_coach_interview_response(self._chat_json(self._coach_interview_prompt(context)))
 
     def _chat_json(self, prompt: str) -> Any:
         payload = {
@@ -797,50 +759,6 @@ def enrich_session_summary_with_provider(
             drops=fallback.drops,
             warnings=fallback.warnings,
             next_recommendation=fallback.next_recommendation,
-            provider=getattr(provider, "provider", "unknown"),
-            model=getattr(provider, "model", None),
-            external_data_sent=getattr(provider, "external_data_sent", False),
-            fallback_used=True,
-        )
-
-
-def enrich_coach_question_with_provider(
-    context: AiCoachQuestionProviderContext, settings: Settings | None = None
-) -> AiCoachQuestionProviderResult:
-    internal = InternalAiProvider()
-    provider = build_ai_provider(settings)
-    try:
-        return provider.build_coach_question_text(context)
-    except AiProviderError:
-        fallback = internal.build_coach_question_text(context)
-        return AiCoachQuestionProviderResult(
-            answer=fallback.answer,
-            key_points=fallback.key_points,
-            suggested_actions=fallback.suggested_actions,
-            provider=getattr(provider, "provider", "unknown"),
-            model=getattr(provider, "model", None),
-            external_data_sent=getattr(provider, "external_data_sent", False),
-            fallback_used=True,
-        )
-
-
-def enrich_coach_intake_with_provider(
-    context: AiCoachIntakeProviderContext, settings: Settings | None = None
-) -> AiCoachIntakeProviderResult:
-    internal = InternalAiProvider()
-    provider = build_ai_provider(settings)
-    try:
-        return provider.build_coach_intake_response(context)
-    except AiProviderError:
-        fallback = internal.build_coach_intake_response(context)
-        return AiCoachIntakeProviderResult(
-            assistant_message=fallback.assistant_message,
-            extracted_fields=fallback.extracted_fields,
-            missing_required_fields=fallback.missing_required_fields,
-            useful_missing_fields=fallback.useful_missing_fields,
-            estimated_fields=fallback.estimated_fields,
-            ready_for_plan=fallback.ready_for_plan,
-            safety_warning=fallback.safety_warning,
             provider=getattr(provider, "provider", "unknown"),
             model=getattr(provider, "model", None),
             external_data_sent=getattr(provider, "external_data_sent", False),

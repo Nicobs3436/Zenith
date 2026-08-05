@@ -169,33 +169,6 @@ describe('api client auth refresh', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(5, 'http://localhost:8000/ai/suggestions/suggestion-1/reject', expect.objectContaining({ method: 'POST' }));
   });
 
-  it('calls guided AI coach question endpoint', async () => {
-    const answer = {
-      question_type: 'next_workout',
-      answer: 'Repite la carga',
-      key_points: ['RPE alto'],
-      related_metrics: { recent_session_count: 1 },
-      suggested_actions: ['Prioriza tecnica'],
-      provider: 'internal',
-      model: 'rules',
-      fallback_used: false,
-      input_summary: {},
-    };
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse(answer));
-    vi.stubGlobal('fetch', fetchMock);
-    const client = await loadClient();
-
-    await expect(client.askCoachQuestion({ question_type: 'next_workout', routine_id: 'routine-1', detail: 'subo peso?' })).resolves.toEqual(answer);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8000/ai/coach/questions',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ question_type: 'next_workout', routine_id: 'routine-1', detail: 'subo peso?' }),
-      }),
-    );
-  });
-
   it('calls AI training plan endpoints', async () => {
     const plan = {
       id: 'plan-1',
@@ -263,7 +236,7 @@ describe('api client auth refresh', () => {
     );
   });
 
-  it('calls clean Coach endpoints', async () => {
+  it('calls Coach endpoints', async () => {
     const plan = {
       id: 'plan-1',
       user_id: 'user-1',
@@ -276,11 +249,11 @@ describe('api client auth refresh', () => {
       physical_limitations: null,
       sensitive_data_acknowledged: false,
       priorities: [],
-      plan_payload: { version: 3, coach_version: 1, routines: [] },
+      plan_payload: { version: 3, source: 'coach', schema_version: 1, routines: [] },
       explanation: 'Plan Coach',
       risk_notes: null,
       confidence: 'medium',
-      input_summary: { source: 'coach_clean' },
+      input_summary: { created_by: 'coach' },
       provider: 'groq',
       model: 'llama-3.3-70b-versatile',
       fallback_used: false,
@@ -318,13 +291,18 @@ describe('api client auth refresh', () => {
       phase: 'ready_for_plan',
       recent_messages: [],
       assistant_message: 'Listo',
-      missing_required_fields: [],
+      known_facts: ['Objetivo hipertrofia'],
+      missing_critical: [],
+      missing_useful: ['sueno'],
+      estimated_fields: ['volumen inicial'],
+      misunderstanding_corrections: [],
+      safety_flags: [],
       ready_for_plan: true,
       draft_plans: [plan],
       accepted_plan: null,
       privacy_notice: 'Privacidad',
       safety_notice: 'Seguridad',
-      next_action: 'generate_plan',
+      next_action: 'generate_plan_preview',
     };
     const fetchMock = vi
       .fn<typeof fetch>()
@@ -340,18 +318,18 @@ describe('api client auth refresh', () => {
 
     await expect(client.getCoachState()).resolves.toEqual(state);
     await expect(client.sendCoachMessage({ message: 'Hola', personal_data_acknowledged: true, sensitive_data_acknowledged: false })).resolves.toEqual(state);
-    await expect(client.generateCoachPlan()).resolves.toEqual(plan);
-    await expect(client.acceptCoachPlan('plan-1')).resolves.toEqual({ ...plan, status: 'accepted' });
-    await expect(client.rejectCoachPlan('plan-1')).resolves.toEqual({ ...plan, status: 'rejected' });
-    await expect(client.modifyCoachPlan('plan-1', { instruction: 'Cambia pecho', sensitive_data_acknowledged: false })).resolves.toEqual({ ...plan, id: 'plan-2' });
+    await expect(client.generateCoachPlanDraft()).resolves.toEqual(plan);
+    await expect(client.acceptCoachPlanDraft('plan-1')).resolves.toEqual({ ...plan, status: 'accepted' });
+    await expect(client.rejectCoachPlanDraft('plan-1')).resolves.toEqual({ ...plan, status: 'rejected' });
+    await expect(client.reviseCoachPlanDraft('plan-1', { instruction: 'Cambia pecho', sensitive_data_acknowledged: false })).resolves.toEqual({ ...plan, id: 'plan-2' });
     await expect(client.resetCoach()).resolves.toEqual({ ...state, phase: 'onboarding', draft_plans: [] });
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://localhost:8000/ai/coach', expect.objectContaining({ method: 'GET' }));
     expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://localhost:8000/ai/coach/messages', expect.objectContaining({ method: 'POST' }));
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'http://localhost:8000/ai/coach/plans', expect.objectContaining({ method: 'POST' }));
-    expect(fetchMock).toHaveBeenNthCalledWith(4, 'http://localhost:8000/ai/coach/plans/plan-1/accept', expect.objectContaining({ method: 'POST' }));
-    expect(fetchMock).toHaveBeenNthCalledWith(5, 'http://localhost:8000/ai/coach/plans/plan-1/reject', expect.objectContaining({ method: 'POST' }));
-    expect(fetchMock).toHaveBeenNthCalledWith(6, 'http://localhost:8000/ai/coach/plans/plan-1/modify', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'http://localhost:8000/ai/coach/plan-drafts', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(4, 'http://localhost:8000/ai/coach/plan-drafts/plan-1/accept', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(5, 'http://localhost:8000/ai/coach/plan-drafts/plan-1/reject', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(6, 'http://localhost:8000/ai/coach/plan-drafts/plan-1/revise', expect.objectContaining({ method: 'POST' }));
     expect(fetchMock).toHaveBeenNthCalledWith(7, 'http://localhost:8000/ai/coach/reset', expect.objectContaining({ method: 'POST' }));
   });
 

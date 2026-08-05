@@ -3,13 +3,13 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
-  acceptCoachPlan,
+  acceptCoachPlanDraft,
   AiTrainingPlan,
   CoachState,
-  generateCoachPlan,
+  generateCoachPlanDraft,
   getCoachState,
-  modifyCoachPlan,
-  rejectCoachPlan,
+  reviseCoachPlanDraft,
+  rejectCoachPlanDraft,
   resetCoach,
   sendCoachMessage,
 } from '@/api/client';
@@ -93,8 +93,15 @@ function progressionSummary(plan: AiTrainingPlan) {
   return [textValue(progression.type, ''), textValue(progression.load_rule, ''), textValue(progression.rep_rule, '')].filter(Boolean).join(' · ');
 }
 
-function fieldIsDone(state: CoachState, field: string) {
-  return !state.missing_required_fields.includes(field);
+function coachReport(plan: AiTrainingPlan) {
+  return asRecord(plan.plan_payload.coach_report);
+}
+
+function reportText(report: Record<string, unknown>, key: string) {
+  const value = report[key];
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.filter((item) => typeof item === 'string').join(' · ');
+  return '';
 }
 
 export default function CoachScreen() {
@@ -162,7 +169,7 @@ export default function CoachScreen() {
     setError(null);
     setNotice(null);
     try {
-      await generateCoachPlan();
+      await generateCoachPlanDraft();
       await loadState();
       setNotice('Plan borrador creado. Revisalo antes de aceptar.');
     } catch (caught) {
@@ -177,7 +184,7 @@ export default function CoachScreen() {
     setError(null);
     setNotice(null);
     try {
-      await acceptCoachPlan(planId);
+      await acceptCoachPlanDraft(planId);
       await loadState();
       setNotice('Plan aceptado. Se crearon tus rutinas reales.');
     } catch (caught) {
@@ -192,7 +199,7 @@ export default function CoachScreen() {
     setError(null);
     setNotice(null);
     try {
-      await rejectCoachPlan(planId);
+      await rejectCoachPlanDraft(planId);
       await loadState();
       setNotice('Plan rechazado. No se creo ninguna rutina.');
     } catch (caught) {
@@ -209,7 +216,7 @@ export default function CoachScreen() {
     setError(null);
     setNotice(null);
     try {
-      await modifyCoachPlan(planId, { instruction, sensitive_data_acknowledged: sensitiveAck });
+      await reviseCoachPlanDraft(planId, { instruction, sensitive_data_acknowledged: sensitiveAck });
       setChanges((current) => ({ ...current, [planId]: '' }));
       await loadState();
       setNotice('Coach creo una nueva version del plan con tus cambios.');
@@ -285,7 +292,7 @@ export default function CoachScreen() {
             <ZenithButton disabled={sending || !message.trim()} onPress={submitMessage} title={sending ? 'Enviando...' : 'Enviar mensaje'} />
             <Pressable disabled={!state.ready_for_plan || generating} onPress={submitGeneratePlan} style={[styles.primaryAction, (!state.ready_for_plan || generating) && styles.disabled]}>
               <Sparkles color={zenith.colors.primaryForeground} size={14} />
-              <Text style={styles.primaryActionText}>{generating ? 'Creando plan...' : 'Crear mi plan'}</Text>
+              <Text style={styles.primaryActionText}>{generating ? 'Creando vista previa...' : 'Generar vista previa'}</Text>
             </Pressable>
             <Pressable disabled={sending} onPress={submitReset} style={[styles.secondaryAction, sending && styles.disabled]}>
               <RotateCcw color={zenith.colors.muted} size={14} />
@@ -297,26 +304,25 @@ export default function CoachScreen() {
 
       {state && (
         <ZenithCard style={styles.profileCard}>
-          <Text style={styles.sectionTitle}>Perfil detectado</Text>
-          <View style={styles.checkGrid}>
-            {Object.keys(REQUIRED_LABELS).map((field) => (
-              <View key={field} style={[styles.checkItem, fieldIsDone(state, field) && styles.checkItemDone]}>
-                <Text style={styles.checkText}>{fieldIsDone(state, field) ? '✓' : '·'} {REQUIRED_LABELS[field]}</Text>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.sectionTitle}>Lo que Coach sabe de ti</Text>
           <Text style={styles.profileLine}>Objetivo: {goalLabel(state.profile.goal)} · Nivel: {state.profile.experience_level ?? 'pendiente'}</Text>
           <Text style={styles.profileLine}>Sexo: {sexLabel(state.profile.biological_sex)} · Edad: {state.profile.age ?? '-'} · Altura: {state.profile.height_cm ?? '-'} cm · Peso: {state.profile.weight_kg ?? '-'} kg</Text>
           <Text style={styles.profileLine}>Disponibilidad: {state.profile.days_per_week ?? '-'} dias · {state.profile.session_duration_minutes ?? '-'} min</Text>
           <Text style={styles.profileLine}>Equipo: {state.profile.equipment.length ? state.profile.equipment.join(', ') : 'pendiente'}</Text>
           <Text style={styles.profileLine}>Prioridades: {state.profile.priorities.length ? state.profile.priorities.join(', ') : 'sin prioridad concreta'}</Text>
           <Text style={styles.profileLine}>Evitar: {state.profile.avoided_exercises.length ? state.profile.avoided_exercises.join(', ') : 'sin restricciones'}</Text>
+          {state.known_facts.length > 0 && <Text style={styles.profileLine}>Hechos confirmados: {state.known_facts.slice(0, 5).join(' · ')}</Text>}
+          {state.misunderstanding_corrections.length > 0 && <Text style={styles.correction}>Correcciones: {state.misunderstanding_corrections.join(' · ')}</Text>}
+          {state.safety_flags.length > 0 && <Text style={styles.risk}>Avisos: {state.safety_flags.join(' · ')}</Text>}
+          {state.missing_critical.length > 0 && <Text style={styles.profileLine}>Imprescindible por completar: {state.missing_critical.map((field) => REQUIRED_LABELS[field] ?? field).join(', ')}</Text>}
+          {state.missing_useful.length > 0 && <Text style={styles.mutedLine}>Util para afinar: {state.missing_useful.slice(0, 8).join(', ')}</Text>}
+          {state.estimated_fields.length > 0 && <Text style={styles.mutedLine}>Estimado inicialmente: {state.estimated_fields.join(', ')}</Text>}
         </ZenithCard>
       )}
 
       <View style={styles.block}>
         <Text style={styles.sectionTitle}>Plan revisable</Text>
-        {draftPlans.length === 0 && <Text style={styles.empty}>Aun no hay borrador nuevo del Coach. Completa el perfil y pulsa Crear mi plan.</Text>}
+        {draftPlans.length === 0 && <Text style={styles.empty}>Aun no hay vista previa. Completa la entrevista y pulsa Generar vista previa.</Text>}
         {draftPlans.map((plan) => (
           <ZenithCard key={plan.id} style={styles.planCard}>
             <View style={styles.cardHeader}>
@@ -346,6 +352,18 @@ export default function CoachScreen() {
               <Text style={styles.previewTitle}>Progresion</Text>
               <Text style={styles.cardText}>{progressionSummary(plan) || textValue(plan.plan_payload.progression)}</Text>
             </View>
+            {Object.keys(coachReport(plan)).length > 0 && (
+              <View style={styles.previewBox}>
+                <Text style={styles.previewTitle}>Informe del Coach</Text>
+                {['user_data_summary', 'assumptions', 'measurable_goals', 'split_justification', 'fatigue_and_deload', 'tracking_template', 'nutrition_and_recovery', 'mistakes_to_avoid', 'next_review_questions'].map((key) => {
+                  const value = reportText(coachReport(plan), key);
+                  return value ? <Text key={key} style={styles.cardText}>{key.split('_').join(' ')}: {value}</Text> : null;
+                })}
+                {asRecords(coachReport(plan).scientific_references).slice(0, 6).map((reference, index) => (
+                  <Text key={`${plan.id}-reference-${index}`} style={styles.note}>{textValue(reference.title, 'Referencia')} · {textValue(reference.year)} · {textValue(reference.evidence_level, 'evidencia')}</Text>
+                ))}
+              </View>
+            )}
             {planRoutines(plan).map((routine, index) => (
               <View key={`${plan.id}-routine-${index}`} style={styles.routinePreview}>
                 <Text style={styles.previewTitle}>Dia {textValue(routine.day, String(index + 1))}: {textValue(routine.name, 'Sesion')}</Text>
@@ -414,6 +432,8 @@ const styles = StyleSheet.create({
   checkItemDone: { backgroundColor: zenith.colors.primarySoft, borderColor: zenith.colors.primaryBorder },
   checkText: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, fontSize: 12 },
   profileLine: { color: zenith.colors.foreground, fontFamily: zenith.font.body, lineHeight: 20 },
+  mutedLine: { color: zenith.colors.muted, fontFamily: zenith.font.body, lineHeight: 20 },
+  correction: { color: zenith.colors.cyan, fontFamily: zenith.font.bodyBold, lineHeight: 20 },
   cardHeader: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   itemTitle: { color: zenith.colors.foreground, flex: 1, fontFamily: zenith.font.bodyBold, fontSize: 16, lineHeight: 21 },
   cardText: { color: zenith.colors.muted, fontFamily: zenith.font.body, lineHeight: 20 },

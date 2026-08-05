@@ -88,18 +88,13 @@ API FastAPI para la gestion de rutinas de gimnasio, registros de entrenamiento y
 - `POST /ai/training-plans/{plan_id}/modify` — crea una nueva version borrador del plan con la instruccion del usuario.
 - `POST /ai/session-summaries/{session_id}/generate` — genera o actualiza un resumen IA de una sesion propia.
 - `GET /ai/session-summaries/{session_id}` — obtiene el resumen IA generado de una sesion propia.
-- `GET /ai/coach/v2` — obtiene el estado del Coach V2, perfil, memoria, propuestas y sesiones recomendadas.
-- `POST /ai/coach/v2/messages` — conversa con Coach V2 y actualiza el perfil resumido.
-- `POST /ai/coach/v2/generate-plan` — genera un plan borrador desde el perfil V2 si estan los datos obligatorios.
-- `POST /ai/coach/v2/planned-sessions/generate` — genera una proxima sesion recomendada desde el plan actual.
-- `POST /ai/coach/v2/proposals/{proposal_id}/accept` — acepta una propuesta automatica del Coach.
-- `POST /ai/coach/v2/proposals/{proposal_id}/reject` — rechaza una propuesta automatica del Coach.
-- `POST /ai/coach/v2/reset` — reinicia perfil y conversacion del Coach V2.
-- `GET /ai/coach/intake` — obtiene o crea la entrevista conversacional minima del entrenador.
-- `POST /ai/coach/intake/messages` — anade un mensaje al intake y actualiza el resumen estructurado.
-- `POST /ai/coach/intake/generate-plan` — genera un plan borrador desde el intake si ya tiene los campos obligatorios.
-- `POST /ai/coach/intake/reset` — reinicia la entrevista del entrenador.
-- `POST /ai/coach/questions` — responde una pregunta guiada al entrenador sin persistir historial ni modificar datos.
+- `GET /ai/coach` — obtiene estado, perfil resumido, memoria conversacional y borradores activos del Coach.
+- `POST /ai/coach/messages` — conversa con Coach usando IA estructurada y actualiza perfil validado.
+- `POST /ai/coach/plan-drafts` — genera una vista previa de plan si la entrevista tiene los datos imprescindibles.
+- `POST /ai/coach/plan-drafts/{plan_id}/accept` — acepta el borrador, crea rutinas reales y ejercicios privados IA pendientes.
+- `POST /ai/coach/plan-drafts/{plan_id}/reject` — rechaza el borrador sin crear rutinas.
+- `POST /ai/coach/plan-drafts/{plan_id}/revise` — crea una nueva version del borrador con cambios pedidos.
+- `POST /ai/coach/reset` — reinicia perfil y conversacion del Coach sin tocar rutinas ni sesiones existentes.
 
 ## Auth
 
@@ -155,11 +150,10 @@ API FastAPI para la gestion de rutinas de gimnasio, registros de entrenamiento y
 - En planes adaptativos, Ollama puede generar la estructura completa del plan usando el catalogo accesible de ejercicios; el backend valida ids, volumen, rangos, coherencia y privacidad antes de guardar.
 - El chat del entrenador usa `AiCoachIntake`: un unico intake activo por usuario con resumen estructurado, ultimos mensajes necesarios, campos faltantes y estado de preparacion para generar plan.
 - El plan desde chat solo se genera si objetivo, nivel, dias por semana y duracion estan completos; crear el borrador no modifica rutinas hasta aceptarlo.
-- Coach V2 reemplaza la experiencia visible del entrenador: usa `CoachProfile`, `CoachConversation`, memoria resumida, propuestas automaticas y sesiones planificadas.
-- Coach V2 exige objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion y equipamiento para generar un plan cientifico revisable.
+- Coach es la experiencia visible del entrenador: usa `CoachProfile`, `CoachConversation`, memoria resumida y borradores revisables.
+- Coach exige objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion y equipamiento para generar una vista previa cientifica revisable.
 - Los resumenes post-sesion devuelven resumen, mejoras, caidas, warnings y proxima recomendacion; no modifican rutinas ni sesiones.
-- Las preguntas guiadas al entrenador responden `next_workout`, `progression`, `fatigue`, `routine_review` y `stats_explanation`; no se persisten, no crean sugerencias y no aplican cambios.
-- En preguntas guiadas, el detalle libre no se envia a Ollama ni se incluye en trazabilidad; solo se usa contexto estructurado propio.
+- Las tablas legacy de Coach V2/intake se mantienen hasta una fase 2 de limpieza de base de datos; no hay endpoints activos para ese flujo.
 - Rechazar una sugerencia no modifica datos de entrenamiento.
 - Las sesiones historicas no se modifican.
 - Las limitaciones fisicas requieren confirmacion explicita porque pueden ser datos sensibles.

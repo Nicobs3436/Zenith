@@ -154,7 +154,7 @@ export default function DashboardScreen() {
         <Link href="/routines" style={styles.quickLink}>Rutinas</Link>
         <Link href="/exercises" style={styles.quickLink}>Ejercicios</Link>
         <Link href="/sessions" style={styles.quickLink}>Sesiones</Link>
-        <Link href="/trainer" style={styles.quickLink}>Entrenador</Link>
+        <Link href="/coach" style={styles.quickLink}>Coach</Link>
       </View>
 
       <ZenithButton onPress={submitLogout} title="Cerrar sesion" variant="danger" />

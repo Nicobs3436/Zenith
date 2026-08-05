@@ -54,7 +54,6 @@ export default function RootLayout() {
       <Stack.Screen name="session-edit" options={{ title: 'Editar sesion' }} />
       <Stack.Screen name="stats" options={{ headerShown: false, title: 'Estadisticas' }} />
       <Stack.Screen name="coach" options={{ headerShown: false, title: 'Entrenador IA' }} />
-      <Stack.Screen name="trainer" options={{ title: 'Entrenador personal' }} />
       <Stack.Screen name="privacy" options={{ title: 'Privacidad' }} />
       <Stack.Screen name="terms" options={{ title: 'Terminos' }} />
     </Stack>

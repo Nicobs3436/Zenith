@@ -110,7 +110,6 @@ export type AiSuggestionType =
   | 'exercise_swap'
   | 'routine_goal_adjustment';
 export type AiSuggestionStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
-export type AiCoachQuestionType = 'next_workout' | 'progression' | 'fatigue' | 'routine_review' | 'stats_explanation';
 
 export type AiSuggestion = {
   id: string;
@@ -129,117 +128,6 @@ export type AiSuggestion = {
   created_at: string;
   reviewed_at: string | null;
   applied_at: string | null;
-};
-
-export type AiCoachQuestionRequest = {
-  question_type: AiCoachQuestionType;
-  routine_id?: string | null;
-  exercise_id?: string | null;
-  session_id?: string | null;
-  detail?: string | null;
-};
-
-export type AiCoachQuestionResponse = {
-  question_type: AiCoachQuestionType;
-  answer: string;
-  key_points: string[];
-  related_metrics: Record<string, unknown>;
-  suggested_actions: string[];
-  provider: string;
-  model: string | null;
-  fallback_used: boolean;
-  input_summary: Record<string, unknown>;
-};
-
-export type AiCoachIntakeMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-};
-
-export type AiCoachIntake = {
-  id: string;
-  user_id: string;
-  status: 'collecting' | 'ready' | 'plan_generated';
-  intake_summary: Record<string, unknown>;
-  recent_messages: AiCoachIntakeMessage[];
-  missing_required_fields: string[];
-  useful_missing_fields: string[];
-  ready_for_plan: boolean;
-  sensitive_data_acknowledged: boolean;
-  assistant_message: string | null;
-  safety_warning: string | null;
-  provider: string;
-  model: string | null;
-  fallback_used: boolean;
-  updated_at: string;
-};
-
-export type AiCoachIntakeMessageRequest = {
-  message: string;
-  sensitive_data_acknowledged: boolean;
-};
-
-export type CoachV2Profile = {
-  id: string;
-  user_id: string;
-  goal: string | null;
-  secondary_goal: string | null;
-  plan_horizon_weeks: number | null;
-  biological_sex: 'male' | 'female' | null;
-  age: number | null;
-  height_cm: number | null;
-  weight_kg: number | null;
-  experience_level: string | null;
-  training_age_months: number | null;
-  days_per_week: number | null;
-  session_duration_minutes: number | null;
-  equipment: string[];
-  priorities: string[];
-  preferred_exercises: string[];
-  avoided_exercises: string[];
-  physical_limitations: string | null;
-  sleep_quality: string | null;
-  stress_level: string | null;
-  current_fatigue: string | null;
-  personal_data_acknowledged: boolean;
-  sensitive_data_acknowledged: boolean;
-  memory_summary: string | null;
-  updated_at: string;
-};
-
-export type CoachV2Message = { role: 'user' | 'assistant'; content: string };
-
-export type CoachV2Conversation = {
-  id: string;
-  user_id: string;
-  phase: 'onboarding' | 'plan_ready' | 'training_active' | 'progress_review' | 'fatigue_review' | 'adjustment_review';
-  last_question: string | null;
-  recent_messages: CoachV2Message[];
-  conversation_summary: string | null;
-  updated_at: string;
-};
-
-export type CoachMemoryEvent = { id: string; event_type: string; summary: string; payload: Record<string, unknown>; created_at: string };
-export type CoachProposal = { id: string; type: string; status: 'pending' | 'accepted' | 'rejected' | 'expired'; recommendation: string; explanation: string; payload: Record<string, unknown>; created_at: string; reviewed_at: string | null };
-export type CoachPlannedSession = { id: string; status: string; title: string; session_payload: Record<string, unknown>; rationale: string; created_at: string; completed_at: string | null };
-
-export type CoachV2State = {
-  profile: CoachV2Profile;
-  conversation: CoachV2Conversation;
-  assistant_message: string;
-  missing_required_fields: string[];
-  ready_for_plan: boolean;
-  memory_events: CoachMemoryEvent[];
-  proposals: CoachProposal[];
-  planned_sessions: CoachPlannedSession[];
-  privacy_notice: string;
-  next_action: string | null;
-};
-
-export type CoachV2MessageRequest = {
-  message: string;
-  personal_data_acknowledged: boolean;
-  sensitive_data_acknowledged: boolean;
 };
 
 export type CoachProfile = {
@@ -277,7 +165,12 @@ export type CoachState = {
   phase: 'onboarding' | 'ready_for_plan' | 'plan_draft' | 'training_active';
   recent_messages: CoachMessage[];
   assistant_message: string;
-  missing_required_fields: string[];
+  known_facts: string[];
+  missing_critical: string[];
+  missing_useful: string[];
+  estimated_fields: string[];
+  misunderstanding_corrections: string[];
+  safety_flags: string[];
   ready_for_plan: boolean;
   draft_plans: AiTrainingPlan[];
   accepted_plan: AiTrainingPlan | null;
@@ -289,6 +182,11 @@ export type CoachState = {
 export type CoachMessageRequest = {
   message: string;
   personal_data_acknowledged: boolean;
+  sensitive_data_acknowledged: boolean;
+};
+
+export type CoachPlanDraftReviseRequest = {
+  instruction: string;
   sensitive_data_acknowledged: boolean;
 };
 
@@ -874,54 +772,6 @@ export function analyzeRoutineGoal(routineId: string) {
   return request<AiSuggestion[]>(`/ai/routines/${routineId}/analyze-goal`, { method: 'POST', auth: true });
 }
 
-export function askCoachQuestion(payload: AiCoachQuestionRequest) {
-  return request<AiCoachQuestionResponse>('/ai/coach/questions', { method: 'POST', auth: true, body: payload });
-}
-
-export function getCoachIntake() {
-  return request<AiCoachIntake>('/ai/coach/intake', { auth: true });
-}
-
-export function sendCoachIntakeMessage(payload: AiCoachIntakeMessageRequest) {
-  return request<AiCoachIntake>('/ai/coach/intake/messages', { method: 'POST', auth: true, body: payload });
-}
-
-export function generateTrainingPlanFromCoachIntake() {
-  return request<AiTrainingPlan>('/ai/coach/intake/generate-plan', { method: 'POST', auth: true });
-}
-
-export function resetCoachIntake() {
-  return request<AiCoachIntake>('/ai/coach/intake/reset', { method: 'POST', auth: true });
-}
-
-export function getCoachV2State() {
-  return request<CoachV2State>('/ai/coach/v2', { auth: true });
-}
-
-export function sendCoachV2Message(payload: CoachV2MessageRequest) {
-  return request<CoachV2State>('/ai/coach/v2/messages', { method: 'POST', auth: true, body: payload });
-}
-
-export function generateCoachV2Plan() {
-  return request<AiTrainingPlan>('/ai/coach/v2/generate-plan', { method: 'POST', auth: true });
-}
-
-export function generateCoachV2PlannedSession() {
-  return request<CoachPlannedSession>('/ai/coach/v2/planned-sessions/generate', { method: 'POST', auth: true });
-}
-
-export function acceptCoachV2Proposal(proposalId: string) {
-  return request<CoachProposal>(`/ai/coach/v2/proposals/${proposalId}/accept`, { method: 'POST', auth: true });
-}
-
-export function rejectCoachV2Proposal(proposalId: string) {
-  return request<CoachProposal>(`/ai/coach/v2/proposals/${proposalId}/reject`, { method: 'POST', auth: true });
-}
-
-export function resetCoachV2() {
-  return request<CoachV2State>('/ai/coach/v2/reset', { method: 'POST', auth: true });
-}
-
 export function getCoachState() {
   return request<CoachState>('/ai/coach', { auth: true });
 }
@@ -930,20 +780,20 @@ export function sendCoachMessage(payload: CoachMessageRequest) {
   return request<CoachState>('/ai/coach/messages', { method: 'POST', auth: true, body: payload });
 }
 
-export function generateCoachPlan() {
-  return request<AiTrainingPlan>('/ai/coach/plans', { method: 'POST', auth: true });
+export function generateCoachPlanDraft() {
+  return request<AiTrainingPlan>('/ai/coach/plan-drafts', { method: 'POST', auth: true });
 }
 
-export function acceptCoachPlan(planId: string) {
-  return request<AiTrainingPlan>(`/ai/coach/plans/${planId}/accept`, { method: 'POST', auth: true });
+export function acceptCoachPlanDraft(planId: string) {
+  return request<AiTrainingPlan>(`/ai/coach/plan-drafts/${planId}/accept`, { method: 'POST', auth: true });
 }
 
-export function rejectCoachPlan(planId: string) {
-  return request<AiTrainingPlan>(`/ai/coach/plans/${planId}/reject`, { method: 'POST', auth: true });
+export function rejectCoachPlanDraft(planId: string) {
+  return request<AiTrainingPlan>(`/ai/coach/plan-drafts/${planId}/reject`, { method: 'POST', auth: true });
 }
 
-export function modifyCoachPlan(planId: string, payload: AiTrainingPlanModifyRequest) {
-  return request<AiTrainingPlan>(`/ai/coach/plans/${planId}/modify`, { method: 'POST', auth: true, body: payload });
+export function reviseCoachPlanDraft(planId: string, payload: CoachPlanDraftReviseRequest) {
+  return request<AiTrainingPlan>(`/ai/coach/plan-drafts/${planId}/revise`, { method: 'POST', auth: true, body: payload });
 }
 
 export function resetCoach() {

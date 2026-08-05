@@ -1,13 +1,12 @@
-from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.infrastructure.db.models.ai import CoachConversation, CoachMemoryEvent, CoachPlannedSession, CoachProfile, CoachProposal
+from app.infrastructure.db.models.ai import CoachConversation, CoachMemoryEvent, CoachProfile
 
 
-class CoachV2Repository:
+class CoachRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
@@ -37,44 +36,11 @@ class CoachV2Repository:
         self.db.flush()
         return conversation
 
-    def list_memory(self, user_id: UUID, limit: int = 12) -> list[CoachMemoryEvent]:
-        statement = select(CoachMemoryEvent).where(CoachMemoryEvent.user_id == user_id).order_by(CoachMemoryEvent.created_at.desc()).limit(limit)
-        return list(self.db.scalars(statement).all())
-
     def add_memory(self, *, user_id: UUID, event_type: str, summary: str, payload: dict) -> CoachMemoryEvent:
         event = CoachMemoryEvent(user_id=user_id, event_type=event_type, summary=summary, payload=payload)
         self.db.add(event)
         self.db.flush()
         return event
-
-    def list_proposals(self, user_id: UUID, limit: int = 20) -> list[CoachProposal]:
-        statement = select(CoachProposal).where(CoachProposal.user_id == user_id).order_by(CoachProposal.created_at.desc()).limit(limit)
-        return list(self.db.scalars(statement).all())
-
-    def create_proposal(self, *, user_id: UUID, type: str, recommendation: str, explanation: str, payload: dict) -> CoachProposal:
-        proposal = CoachProposal(user_id=user_id, type=type, recommendation=recommendation, explanation=explanation, payload=payload)
-        self.db.add(proposal)
-        self.db.flush()
-        return proposal
-
-    def get_proposal(self, proposal_id: UUID, user_id: UUID) -> CoachProposal | None:
-        return self.db.scalar(select(CoachProposal).where(CoachProposal.id == proposal_id, CoachProposal.user_id == user_id))
-
-    def review_proposal(self, proposal: CoachProposal, status: str) -> CoachProposal:
-        proposal.status = status
-        proposal.reviewed_at = datetime.now(UTC)
-        self.db.flush()
-        return proposal
-
-    def list_planned_sessions(self, user_id: UUID, limit: int = 10) -> list[CoachPlannedSession]:
-        statement = select(CoachPlannedSession).where(CoachPlannedSession.user_id == user_id).order_by(CoachPlannedSession.created_at.desc()).limit(limit)
-        return list(self.db.scalars(statement).all())
-
-    def create_planned_session(self, *, user_id: UUID, title: str, session_payload: dict, rationale: str) -> CoachPlannedSession:
-        planned = CoachPlannedSession(user_id=user_id, title=title, session_payload=session_payload, rationale=rationale)
-        self.db.add(planned)
-        self.db.flush()
-        return planned
 
     def reset(self, user_id: UUID) -> tuple[CoachProfile, CoachConversation]:
         profile = self.get_or_create_profile(user_id)

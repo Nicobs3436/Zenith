@@ -67,7 +67,7 @@ Permitir que un usuario gestione ejercicios, cree rutinas, registre sesiones rea
 - Analisis IA: `POST /ai/routines/{routine_id}/analyze-goal`.
 - Planes IA: `POST /ai/training-plans/generate`, `GET /ai/training-plans`, `GET /ai/training-plans/{plan_id}`, `POST /ai/training-plans/{plan_id}/accept`, `POST /ai/training-plans/{plan_id}/reject`, `POST /ai/training-plans/{plan_id}/modify`.
 - Resumenes IA: `POST /ai/session-summaries/{session_id}/generate`, `GET /ai/session-summaries/{session_id}`.
-- Preguntas entrenador IA: `POST /ai/coach/questions`.
+- Coach IA conversacional: `GET /ai/coach`, `POST /ai/coach/messages` y vistas previas en `/ai/coach/plan-drafts`.
 
 ## QA MVP
 

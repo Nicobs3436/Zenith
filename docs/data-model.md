@@ -103,13 +103,13 @@
 
 ### CoachProfile / CoachConversation / CoachMemoryEvent / CoachProposal / CoachPlannedSession
 
-- Coach V2 reemplaza la experiencia visible del entrenador.
+- Coach usa estas tablas para la experiencia visible del entrenador.
 - `CoachProfile` guarda perfil estructurado: objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion, equipamiento, prioridades, ejercicios preferidos/evitados, limitaciones confirmadas y memoria resumida.
 - `CoachConversation` guarda fase, ultima pregunta y ultimos mensajes necesarios; no es historial completo.
 - `CoachMemoryEvent` guarda decisiones importantes resumidas.
-- `CoachProposal` guarda propuestas automaticas revisables: revision de fatiga, progreso, ajuste o recomendacion.
+- `CoachProposal` y `CoachPlannedSession` son legacy y se conservan hasta fase 2 de limpieza de base de datos.
 - `CoachPlannedSession` guarda sesiones futuras recomendadas que no son sesiones historicas registradas.
-- Coach V2 no crea rutinas reales hasta aceptar un `AiTrainingPlan` borrador.
+- Coach no crea rutinas reales hasta aceptar un `AiTrainingPlan` borrador.
 
 ### AiSessionSummary
 
@@ -163,5 +163,5 @@
 - Sugerencias IA guardan trazabilidad, no usan `notes`, no mezclan unidades, validan ejercicios alternativos accesibles y no modifican sesiones historicas.
 - Planes IA requieren confirmacion explicita para limitaciones fisicas o modificaciones sensibles, no sustituyen consejo medico/profesional y solo crean rutinas al aceptar.
 - Intake conversacional no genera planes sin objetivo, nivel, dias por semana y duracion; redacta mensajes sensibles no confirmados.
-- Coach V2 no genera planes sin objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion y equipamiento; entiende respuestas cortas por contexto y gimnasio comercial.
+- Coach no genera vistas previas sin objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion y equipamiento; la entrevista IA pregunta por bloques y evita repetir datos conocidos.
 - Resumenes post-sesion IA no usan notas, no mezclan unidades, no modifican datos historicos y respetan ownership de sesiones.

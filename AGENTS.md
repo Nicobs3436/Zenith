@@ -9,7 +9,7 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - Validacion: Pydantic v2.
 - Frontend: Expo React Native + TypeScript + Expo Router.
 - Tests: pytest para backend; Vitest para helpers frontend.
-- IA actual: Coach V2 conversacional continuo, entrenador interno/local de progresion, planes adaptativos, resumenes post-sesion y preguntas guiadas legacy con proveedor opcional Ollama local, coste 0, sin proveedor remoto, con deduplicacion/expiracion de sugerencias.
+- IA actual: Coach conversacional continuo con Groq para entrevista natural y planes revisables, entrenador interno/local de progresion, planes adaptativos legacy y resumenes post-sesion; coste 0 segun cuota gratuita Groq y sin proveedor remoto adicional.
 
 ## Comandos
 - Backend: ejecutar comandos desde `backend/`.
@@ -50,9 +50,9 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - IA actual sugiere sobrecarga progresiva, deload inteligente, cambios de ejercicio, ajustes de volumen/reps/descanso, analisis de objetivo por rutina y estancamiento; en planes adaptativos Ollama puede proponer la estructura completa usando el catalogo accesible y backend valida antes de guardar; solo modifica rutinas al aceptar una sugerencia o un plan adaptativo.
 - El entrenador personal puede crear planes adaptativos; con Ollama local la IA propone la estructura y el backend valida ids, volumen, rangos, coherencia y privacidad; al aceptar crea rutinas reales, no sesiones.
 - El chat del entrenador guarda solo resumen estructurado y ultimos mensajes necesarios en `AiCoachIntake`; no genera plan hasta tener objetivo, nivel, dias por semana y duracion.
-- Coach visible actual usa flujo limpio `/ai/coach`: perfil/memoria resumida, exige sexo biologico, edad, altura, peso, objetivo, nivel, dias, duracion y equipamiento para generar planes; Coach V2/intake quedan legacy.
+- Coach visible actual usa solo `/ai/coach`: entrevista natural por bloques con Groq, perfil/memoria resumida, exige sexo biologico, edad, altura, peso, objetivo, nivel, dias, duracion y equipamiento para generar vista previa; al aceptar crea rutinas.
 - Los resumenes post-sesion generan resumen, mejoras, caidas, warnings y proxima recomendacion; no modifican rutinas, sesiones ni series.
-- Las preguntas guiadas al entrenador no se persisten, no crean sugerencias y no modifican rutinas, sesiones, series ni planes; el texto libre de detalle no se envia a proveedores.
+- Las tablas legacy de Coach V2/intake se conservan hasta una fase 2 segura de limpieza de base de datos, pero no forman parte del flujo activo.
 
 ## Convenciones
 - Antes de implementar, separar dominio de gimnasio, persistencia, API e integraciones externas.
