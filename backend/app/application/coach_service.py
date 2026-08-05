@@ -1,4 +1,6 @@
 import json
+import re
+import unicodedata
 from typing import Any
 from uuid import UUID
 
@@ -98,6 +100,7 @@ class CoachService:
         if data.sensitive_data_acknowledged:
             profile.sensitive_data_acknowledged = True
 
+        local_changed = self._apply_profile_updates(profile, state, self._local_profile_updates(data.message, profile))
         missing_critical = self._missing_critical(profile)
         provider = build_ai_provider()
         context = CoachInterviewProviderContext(
@@ -117,7 +120,7 @@ class CoachService:
         except AiProviderError as error:
             raise CoachCannotGenerateError(str(error)) from error
 
-        changed = self._apply_profile_updates(profile, state, result.profile_updates)
+        changed = self._merge_unique(local_changed, self._apply_profile_updates(profile, state, result.profile_updates))
         state = self._updated_interview_state(state, result, changed)
         missing_critical = self._missing_critical(profile)
         if missing_critical:
@@ -369,6 +372,76 @@ class CoachService:
                     state["profile_extra"] = extra
                     changed.append(field)
         return changed
+
+    def _local_profile_updates(self, message: str, profile: CoachProfile) -> dict[str, Any]:
+        text = self._normalized_text(message)
+        updates: dict[str, Any] = {}
+        if profile.goal is None:
+            strength_markers = ["ganar fuerza", "mas fuerza", "entrenamiento de fuerza", "powerlifting"]
+            if any(marker in text for marker in strength_markers) or re.search(r"\bfuerza\b", text):
+                updates["goal"] = "strength"
+            elif any(marker in text for marker in ["hipertrofia", "ganar musculo", "masa muscular", "ponerme grande", "musculo"]):
+                updates["goal"] = "hypertrophy"
+            elif any(marker in text for marker in ["perder grasa", "bajar peso", "adelgazar", "definir", "perdida de grasa"]):
+                updates["goal"] = "fat_loss"
+            elif "salud" in text:
+                updates["goal"] = "general_health"
+            elif "resistencia" in text or "endurance" in text:
+                updates["goal"] = "endurance"
+        if profile.biological_sex is None:
+            if re.search(r"\b(hombre|masculino|varon|chico)\b", text):
+                updates["biological_sex"] = "male"
+            elif re.search(r"\b(mujer|femenino|chica)\b", text):
+                updates["biological_sex"] = "female"
+        if profile.experience_level is None:
+            if re.search(r"\b(principiante|novato|nuevo)\b", text):
+                updates["experience_level"] = "beginner"
+            elif "intermedio" in text:
+                updates["experience_level"] = "intermediate"
+            elif re.search(r"\b(avanzado|experto)\b", text):
+                updates["experience_level"] = "advanced"
+        if profile.age is None:
+            match = re.search(r"\b(1[4-9]|[2-8][0-9]|90)\s*(anos|a\.?|edad)\b", text)
+            if match:
+                updates["age"] = int(match.group(1))
+        if profile.height_cm is None:
+            match = re.search(r"\b(1[2-9][0-9]|2[0-2][0-9]|230)\s*cm\b", text)
+            if match:
+                updates["height_cm"] = int(match.group(1))
+        if profile.weight_kg is None:
+            match = re.search(r"\b([3-9][0-9]|1[0-9]{2}|2[0-4][0-9]|250)\s*kg\b", text)
+            if match:
+                updates["weight_kg"] = int(match.group(1))
+        if profile.days_per_week is None:
+            match = re.search(r"\b([1-7])\s*(dias|d)\b", text)
+            if match:
+                updates["days_per_week"] = int(match.group(1))
+        if profile.session_duration_minutes is None:
+            match = re.search(r"\b([2-9][0-9]|1[0-7][0-9]|180)\s*(min|minutos)\b", text)
+            if match:
+                updates["session_duration_minutes"] = int(match.group(1))
+        if not profile.equipment:
+            equipment: list[str] = []
+            if "gimnasio" in text:
+                equipment.extend(["barra", "mancuernas", "banco", "polea", "maquina"])
+            known_equipment = [
+                ("mancuerna", "mancuernas"),
+                ("barra", "barra"),
+                ("banco", "banco"),
+                ("polea", "polea"),
+                ("maquina", "maquina"),
+                ("casa", "peso corporal"),
+            ]
+            for marker, value in known_equipment:
+                if marker in text:
+                    equipment.append(value)
+            if equipment:
+                updates["equipment"] = equipment
+        return updates
+
+    def _normalized_text(self, value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", value.lower())
+        return " ".join("".join(character for character in normalized if not unicodedata.combining(character)).split())
 
     def _clean_update(self, field: str, value: Any, profile: CoachProfile):
         if field not in _PROFILE_FIELDS and field not in _EXTRA_FIELDS:

@@ -1,4 +1,6 @@
 import json
+import re
+import time
 from dataclasses import dataclass
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -8,6 +10,10 @@ from app.core.config import Settings, get_settings
 
 MAX_TEXT_LENGTH = 600
 VALID_CONFIDENCE = {"low", "medium", "high"}
+GROQ_MAX_RETRIES = 2
+GROQ_INTERVIEW_MAX_TOKENS = 600
+GROQ_EVIDENCE_MAX_TOKENS = 450
+GROQ_TEXT_MAX_TOKENS = 700
 
 
 class AiProviderError(Exception):
@@ -507,7 +513,7 @@ class OllamaAiProvider:
         safe_context = {
             "profile": context.profile,
             "interview_state": context.interview_state,
-            "recent_messages": context.recent_messages[-10:],
+            "recent_messages": context.recent_messages[-4:],
             "latest_user_message": context.user_message,
             "personal_data_acknowledged": context.personal_data_acknowledged,
             "sensitive_data_acknowledged": context.sensitive_data_acknowledged,
@@ -548,10 +554,11 @@ class OllamaAiProvider:
             "body_fat_percent",
         ]
         return (
-            "Actua como un equipo multidisciplinar: especialista en ciencias del deporte, entrenador de hipertrofia/fuerza, "
-            "experto en biomecanica, fisiologia, recuperacion y prevencion de lesiones, e investigador critico. "
-            "Tu tarea ahora es SOLO entrevistar. No generes programa ni tablas de entrenamiento hasta que ready_for_plan sea true y el usuario pida la vista previa. "
-            "Conversa de forma natural, profesional y clara. Pregunta por bloques manejables, no por campos sueltos. No repitas datos ya conocidos. "
+            "Eres el Coach de Zenith: entrenador personal experto en fuerza, hipertrofia, biomecanica, recuperacion y seguridad. "
+            "Tu tarea ahora es SOLO entrevistar de forma natural. No generes programa hasta que ready_for_plan sea true y el usuario pida vista previa. "
+            "No repitas bienvenida ni preguntes datos ya conocidos. Si el usuario escribe informal o con errores, interpreta la intencion razonable. "
+            "Mapea objetivos: fuerza/ganar fuerza/powerlifting=strength; hipertrofia/ganar musculo/masa=hypertrophy; perder grasa/definir/bajar peso=fat_loss; salud=general_health; resistencia=endurance. "
+            "Si ya entendiste un dato, confirmalo brevemente y pregunta el siguiente bloque faltante. Pregunta por bloques manejables, no como formulario. "
             "Corrige malentendidos si el usuario aclara algo. Distingue datos imprescindibles, utiles y estimables. "
             "Si hay dolor, lesion, limitacion o antecedente medico, no diagnostiques; recomienda valoracion sanitaria si hay dolor agudo, creciente, persistente o sintomas preocupantes. "
             "No guardes ni devuelvas physical_limitations si sensitive_data_acknowledged=false; en ese caso pide confirmacion del aviso medico antes de tratar esos datos. "
@@ -562,7 +569,7 @@ class OllamaAiProvider:
             f"{json.dumps(allowed_updates, ensure_ascii=False)}. "
             "missing_critical debe contener solo datos imprescindibles que falten para disenar un plan inicial seguro: "
             "goal, biological_sex, age, height_cm, weight_kg, experience_level, days_per_week, session_duration_minutes, equipment. "
-            "Bloques de entrevista: 1 datos personales/objetivo; 2 experiencia/rutina/resultados/marcas; 3 disponibilidad/dias/duracion/lugar; "
+            "Bloques: 1 objetivo y datos personales; 2 experiencia/rutina/marcas; 3 disponibilidad/dias/duracion/lugar; "
             "4 equipamiento; 5 preferencias/prioridades; 6 molestias/lesiones; 7 sueno/estres/actividad; 8 nutricion/objetivo temporal; 9 registro/seguimiento. "
             "ready_for_plan solo puede ser true cuando no falte ningun dato imprescindible. Contexto estructurado: "
             f"{json.dumps(safe_context, ensure_ascii=False)}"
@@ -751,24 +758,24 @@ class GroqAiProvider(OllamaAiProvider):
         self.timeout_seconds = settings.ai_timeout_seconds
 
     def build_explanation(self, context: AiProviderContext) -> AiProviderResult:
-        return self._parse_model_response(self._chat_json(self._prompt(context)))
+        return self._parse_model_response(self._chat_json(self._prompt(context), max_tokens=GROQ_TEXT_MAX_TOKENS))
 
     def build_training_plan_text(self, context: AiTrainingPlanProviderContext) -> AiTrainingPlanProviderResult:
-        return self._parse_training_plan_response(self._chat_json(self._training_plan_prompt(context)))
+        return self._parse_training_plan_response(self._chat_json(self._training_plan_prompt(context), max_tokens=GROQ_TEXT_MAX_TOKENS))
 
     def build_training_plan_structure(self, context: AiTrainingPlanProviderContext) -> AiTrainingPlanStructureProviderResult:
         return self._parse_training_plan_structure_response(self._chat_json(self._training_plan_structure_prompt(context)))
 
     def build_session_summary_text(self, context: AiSessionSummaryProviderContext) -> AiSessionSummaryProviderResult:
-        return self._parse_session_summary_response(self._chat_json(self._session_summary_prompt(context)))
+        return self._parse_session_summary_response(self._chat_json(self._session_summary_prompt(context), max_tokens=GROQ_TEXT_MAX_TOKENS))
 
     def build_coach_interview_response(self, context: CoachInterviewProviderContext) -> CoachInterviewProviderResult:
-        return self._parse_coach_interview_response(self._chat_json(self._coach_interview_prompt(context)))
+        return self._parse_coach_interview_response(self._chat_json(self._coach_interview_prompt(context), max_tokens=GROQ_INTERVIEW_MAX_TOKENS))
 
     def build_coach_evidence_queries(self, context: CoachEvidenceQueryProviderContext) -> CoachEvidenceQueryProviderResult:
-        return self._parse_coach_evidence_query_response(self._chat_json(self._coach_evidence_query_prompt(context)))
+        return self._parse_coach_evidence_query_response(self._chat_json(self._coach_evidence_query_prompt(context), max_tokens=GROQ_EVIDENCE_MAX_TOKENS))
 
-    def _chat_json(self, prompt: str) -> Any:
+    def _chat_json(self, prompt: str, *, max_tokens: int | None = None) -> Any:
         payload = {
             "model": self.model,
             "messages": [
@@ -778,28 +785,9 @@ class GroqAiProvider(OllamaAiProvider):
             "response_format": {"type": "json_object"},
             "temperature": 0.4,
         }
-        request = Request(
-            f"{self.base_url}/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-                "User-Agent": "ZenithCoach/1.0",
-            },
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=self.timeout_seconds) as response:
-                raw = response.read().decode("utf-8")
-        except HTTPError as error:
-            detail = self._http_error_detail(error)
-            message = f"Groq request failed with status {error.code}."
-            if detail:
-                message = f"{message} {detail}"
-            raise AiProviderError(message) from error
-        except (OSError, URLError) as error:
-            raise AiProviderError("Groq request failed.") from error
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        raw = self._send_chat_request(payload)
 
         try:
             parsed = json.loads(raw)
@@ -807,6 +795,52 @@ class GroqAiProvider(OllamaAiProvider):
             return json.loads(content)
         except (KeyError, IndexError, TypeError, ValueError) as error:
             raise AiProviderError("Groq returned invalid JSON.") from error
+
+    def _send_chat_request(self, payload: dict[str, Any]) -> str:
+        last_message = "Groq request failed."
+        for attempt in range(GROQ_MAX_RETRIES + 1):
+            request = Request(
+                f"{self.base_url}/chat/completions",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                    "User-Agent": "ZenithCoach/1.0",
+                },
+                method="POST",
+            )
+            try:
+                with urlopen(request, timeout=self.timeout_seconds) as response:
+                    return response.read().decode("utf-8")
+            except HTTPError as error:
+                detail = self._http_error_detail(error)
+                last_message = self._provider_error_message(error.code, detail)
+                if error.code == 429 and attempt < GROQ_MAX_RETRIES:
+                    time.sleep(self._retry_after_seconds(detail))
+                    continue
+                raise AiProviderError(last_message) from error
+            except (OSError, URLError) as error:
+                raise AiProviderError("Groq request failed.") from error
+        raise AiProviderError(last_message)
+
+    def _provider_error_message(self, status_code: int, detail: str | None) -> str:
+        if status_code == 429:
+            return "Groq free-tier rate limit reached. Espera unos segundos y reintenta."
+        message = f"Groq request failed with status {status_code}."
+        if detail:
+            message = f"{message} {detail}"
+        return message
+
+    def _retry_after_seconds(self, detail: str | None) -> float:
+        if not detail:
+            return 1.0
+        match = re.search(r"try again in\s+(\d+(?:\.\d+)?)\s*(ms|s)", detail, flags=re.IGNORECASE)
+        if not match:
+            return 1.0
+        value = float(match.group(1))
+        seconds = value / 1000 if match.group(2).lower() == "ms" else value
+        return min(max(seconds + 0.25, 0.25), 5.0)
 
     def _http_error_detail(self, error: HTTPError) -> str | None:
         try:

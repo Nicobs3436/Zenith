@@ -22,8 +22,11 @@ class FakeGroqResponse:
 
 
 class FakeGroqErrorBody:
+    def __init__(self, body: bytes | None = None) -> None:
+        self.body = body or b'{"error":{"message":"Model is not allowed for this project."}}'
+
     def read(self):
-        return b'{"error":{"message":"Model is not allowed for this project."}}'
+        return self.body
 
     def close(self):
         return None
@@ -58,6 +61,23 @@ def use_fake_groq_http_error(monkeypatch, status_code: int) -> None:
         raise HTTPError("https://api.groq.com/openai/v1/chat/completions", status_code, "Forbidden", hdrs=None, fp=FakeGroqErrorBody())
 
     monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
+
+
+def empty_interview_response() -> bytes:
+    return groq_chat_response(
+        {
+            "assistant_message": "Entendido: buscamos fuerza. Para seguir, dime edad, sexo, altura, peso, nivel, dias, duracion y equipamiento.",
+            "profile_updates": {},
+            "known_facts": ["Objetivo principal: fuerza"],
+            "missing_critical": ["biological_sex", "age", "height_cm", "weight_kg", "experience_level", "days_per_week", "session_duration_minutes", "equipment"],
+            "missing_useful": [],
+            "estimated_fields": [],
+            "misunderstanding_corrections": [],
+            "safety_flags": [],
+            "ready_for_plan": False,
+            "next_questions": ["Dime edad, sexo, altura, peso, nivel, dias, duracion y equipamiento."],
+        }
+    )
 
 
 def interview_response(*, include_sensitive: bool = False) -> bytes:
@@ -255,6 +275,65 @@ def test_coach_message_uses_groq_and_updates_profile(monkeypatch, client_with_db
     assert body["profile"]["session_duration_minutes"] == 60
     assert "mancuernas" in body["profile"]["equipment"]
     assert body["known_facts"]
+
+
+def test_coach_message_understands_strength_in_natural_language(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, _session_factory = client_with_db
+    use_fake_groq_sequence(monkeypatch, [empty_interview_response()])
+    token = register_and_login(client, "coach-strength@example.com", "coach_strength")
+
+    response = client.post(
+        "/ai/coach/messages",
+        headers=auth_headers(token),
+        json={
+            "message": "quieor un entrenamiento de fuerza",
+            "personal_data_acknowledged": True,
+            "sensitive_data_acknowledged": False,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["profile"]["goal"] == "strength"
+    assert "goal" not in body["missing_critical"]
+
+
+def test_coach_message_retries_groq_free_tier_rate_limit(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, _session_factory = client_with_db
+    monkeypatch.setenv("APP_AI_PROVIDER", "groq")
+    monkeypatch.setenv("APP_AI_GROQ_API_KEY", "test-groq-key")
+    monkeypatch.setenv("APP_AI_GROQ_MODEL", "llama-3.1-8b-instant")
+    get_settings.cache_clear()
+    queue = ["rate_limit", empty_interview_response()]
+    sleeps: list[float] = []
+    request_bodies: list[dict] = []
+
+    def fake_urlopen(request, timeout):
+        request_bodies.append(json.loads(request.data.decode("utf-8")))
+        item = queue.pop(0)
+        if item == "rate_limit":
+            body = b'{"error":{"message":"Rate limit reached. Please try again in 1ms."}}'
+            raise HTTPError("https://api.groq.com/openai/v1/chat/completions", 429, "Too Many Requests", hdrs=None, fp=FakeGroqErrorBody(body))
+        return FakeGroqResponse(item)
+
+    monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
+    monkeypatch.setattr("app.application.ai_provider.time.sleep", lambda seconds: sleeps.append(seconds))
+    token = register_and_login(client, "coach-rate-limit@example.com", "coach_rate_limit")
+
+    response = client.post(
+        "/ai/coach/messages",
+        headers=auth_headers(token),
+        json={
+            "message": "fuerza",
+            "personal_data_acknowledged": True,
+            "sensitive_data_acknowledged": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["profile"]["goal"] == "strength"
+    assert sleeps == [0.251]
+    assert request_bodies[0]["max_tokens"] == 600
 
 
 def test_coach_does_not_store_limitations_without_ack(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
