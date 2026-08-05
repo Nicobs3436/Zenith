@@ -59,7 +59,10 @@ def add_coach_message(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    return coach_service.add_message(db, current_user, data)
+    try:
+        return coach_service.add_message(db, current_user, data)
+    except CoachCannotGenerateError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @router.post("/coach/plan-drafts", response_model=AiTrainingPlanRead, status_code=status.HTTP_201_CREATED)

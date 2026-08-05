@@ -256,6 +256,25 @@ def test_coach_does_not_store_limitations_without_ack(monkeypatch, client_with_d
     assert response.json()["safety_flags"] == ["dolor requiere precaucion"]
 
 
+def test_coach_message_returns_readable_error_when_groq_fails(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, _session_factory = client_with_db
+    use_fake_groq_sequence(monkeypatch, [b"not-json"])
+    token = register_and_login(client, "coach-error@example.com", "coach_error")
+
+    response = client.post(
+        "/ai/coach/messages",
+        headers=auth_headers(token),
+        json={
+            "message": "acepto el aviso, quiero un entrenamiento de fuerza",
+            "personal_data_acknowledged": True,
+            "sensitive_data_acknowledged": True,
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Coach AI interview failed."
+
+
 def test_coach_generates_groq_plan_draft(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
     client, session_factory = client_with_db
     seed_exercises(session_factory)
