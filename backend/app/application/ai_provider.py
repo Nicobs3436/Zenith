@@ -788,7 +788,11 @@ class GroqAiProvider(OllamaAiProvider):
             with urlopen(request, timeout=self.timeout_seconds) as response:
                 raw = response.read().decode("utf-8")
         except HTTPError as error:
-            raise AiProviderError(f"Groq request failed with status {error.code}.") from error
+            detail = self._http_error_detail(error)
+            message = f"Groq request failed with status {error.code}."
+            if detail:
+                message = f"{message} {detail}"
+            raise AiProviderError(message) from error
         except (OSError, URLError) as error:
             raise AiProviderError("Groq request failed.") from error
 
@@ -798,6 +802,26 @@ class GroqAiProvider(OllamaAiProvider):
             return json.loads(content)
         except (KeyError, IndexError, TypeError, ValueError) as error:
             raise AiProviderError("Groq returned invalid JSON.") from error
+
+    def _http_error_detail(self, error: HTTPError) -> str | None:
+        try:
+            body = error.read().decode("utf-8")
+        except (AttributeError, OSError, UnicodeDecodeError):
+            return None
+        if not body:
+            return None
+        try:
+            parsed = json.loads(body)
+        except ValueError:
+            return body.strip()[:300]
+        if not isinstance(parsed, dict):
+            return None
+        detail = parsed.get("error") or parsed.get("detail") or parsed.get("message")
+        if isinstance(detail, dict):
+            text = detail.get("message") or detail.get("type") or detail.get("code")
+        else:
+            text = detail
+        return str(text).strip()[:300] if text else None
 
 
 def build_ai_provider(settings: Settings | None = None):

@@ -21,6 +21,14 @@ class FakeGroqResponse:
         return self.body
 
 
+class FakeGroqErrorBody:
+    def read(self):
+        return b'{"error":{"message":"Model is not allowed for this project."}}'
+
+    def close(self):
+        return None
+
+
 def groq_chat_response(payload: dict) -> bytes:
     return json.dumps({"choices": [{"message": {"content": json.dumps(payload)}}]}).encode("utf-8")
 
@@ -47,7 +55,7 @@ def use_fake_groq_http_error(monkeypatch, status_code: int) -> None:
     get_settings.cache_clear()
 
     def fake_urlopen(_request, timeout):
-        raise HTTPError("https://api.groq.com/openai/v1/chat/completions", status_code, "Forbidden", hdrs=None, fp=None)
+        raise HTTPError("https://api.groq.com/openai/v1/chat/completions", status_code, "Forbidden", hdrs=None, fp=FakeGroqErrorBody())
 
     monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
 
@@ -304,7 +312,7 @@ def test_coach_message_returns_groq_status_when_provider_forbidden(monkeypatch, 
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "Groq request failed with status 403."
+    assert response.json()["detail"] == "Groq request failed with status 403. Model is not allowed for this project."
 
 
 def test_coach_generates_groq_plan_draft(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
