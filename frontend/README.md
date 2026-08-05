@@ -92,11 +92,12 @@ Ejemplo con PC en `192.168.1.44`:
 
 ## Entrenador Personal
 
-- Ruta: `src/app/trainer.tsx`.
+- Ruta: `src/app/coach.tsx`.
 - Genera planes adaptativos con objetivo, nivel, dias por semana, duracion, equipamiento y prioridades.
 - Permite limitaciones fisicas opcionales con aviso de datos sensibles; se envian solo tras confirmacion y se usan para generar el plan.
 - Permite pedir modificaciones sobre planes en borrador; cada cambio genera una nueva version revisable.
 - Coach usa conversacion natural por bloques y genera vistas previas revisables antes de crear rutinas.
+- Muestra evidencia PubMed utilizada por el borrador cuando el backend la recupera.
 - Las respuestas guiadas muestran puntos clave, acciones sugeridas y proveedor/modelo/fallback; no modifican rutinas, sesiones ni planes.
 - Muestra accesos a sesiones recientes para abrir el detalle y generar o revisar resumenes IA post-sesion.
 - Muestra cada rutina del plan con ejercicios, series, reps, descanso, RPE y RIR planificados.

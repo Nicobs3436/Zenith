@@ -50,7 +50,7 @@ class AiTrainingPlanService:
         if not exercises and not require_ai_provider:
             raise AiTrainingPlanCannotGenerateError("No accessible exercises available.")
 
-        provider_result = self._generate_plan_with_provider(data, exercises, require_ai_provider=require_ai_provider)
+        provider_result = self._generate_plan_with_provider(data, exercises, require_ai_provider=require_ai_provider, coach_brief=coach_brief)
         plan_payload = provider_result.plan_payload
         if coach_brief is not None and plan_payload.get("version") == 3:
             plan_payload["coach_brief"] = coach_brief
@@ -59,6 +59,8 @@ class AiTrainingPlanService:
         if plan_payload.get("version") == 3:
             plan_payload["generated_by"] = {**dict(plan_payload.get("generated_by") or {}), "backend_validated": True}
         input_summary = self._input_summary(data, exercises, provider_result)
+        if coach_brief and isinstance(coach_brief.get("evidence"), dict):
+            input_summary["evidence"] = coach_brief["evidence"]
         plan = AiTrainingPlanRepository(db).create(
             user_id=user.id,
             goal=data.goal,
@@ -167,6 +169,7 @@ class AiTrainingPlanService:
         plan_id: UUID,
         user: User,
         data: AiTrainingPlanModifyRequest,
+        coach_brief: dict | None = None,
     ) -> AiTrainingPlan:
         repository = AiTrainingPlanRepository(db)
         original = repository.get_by_user(plan_id, user.id)
@@ -195,6 +198,7 @@ class AiTrainingPlanService:
             modified_request,
             exercises,
             modification_instruction=data.instruction,
+            coach_brief=coach_brief,
         )
         plan_payload = provider_result.plan_payload
         plan_payload = self._post_process_plan_payload(plan_payload, post_process)
@@ -206,6 +210,8 @@ class AiTrainingPlanService:
             modified_from_plan_id=str(original.id),
             modification_instruction=data.instruction,
         )
+        if coach_brief and isinstance(coach_brief.get("evidence"), dict):
+            input_summary["evidence"] = coach_brief["evidence"]
         plan = repository.create(
             user_id=user.id,
             goal=modified_request.goal,
@@ -292,11 +298,12 @@ class AiTrainingPlanService:
         *,
         modification_instruction: str | None = None,
         require_ai_provider: bool = False,
+        coach_brief: dict | None = None,
     ) -> AiTrainingPlanStructureProviderResult:
         provider = build_ai_provider()
         if require_ai_provider and getattr(provider, "provider", None) not in STRUCTURAL_AI_PROVIDERS:
             raise AiTrainingPlanCannotGenerateError("Coach V3 requires Groq or Ollama as the AI provider.")
-        context = self._provider_context(data, exercises, modification_instruction=modification_instruction)
+        context = self._provider_context(data, exercises, modification_instruction=modification_instruction, coach_brief=coach_brief)
         if hasattr(provider, "build_training_plan_structure"):
             try:
                 result = provider.build_training_plan_structure(context)
@@ -308,6 +315,7 @@ class AiTrainingPlanService:
                     exercises,
                     modification_instruction=modification_instruction,
                     validation_errors=[str(error)],
+                    coach_brief=coach_brief,
                 )
                 try:
                     result = provider.build_training_plan_structure(repair_context)
@@ -333,6 +341,7 @@ class AiTrainingPlanService:
         *,
         modification_instruction: str | None = None,
         validation_errors: list[str] | None = None,
+        coach_brief: dict | None = None,
     ) -> AiTrainingPlanProviderContext:
         return AiTrainingPlanProviderContext(
             goal=data.goal,
@@ -350,6 +359,7 @@ class AiTrainingPlanService:
             exercise_catalog=self._exercise_catalog(exercises),
             physical_limitations=data.physical_limitations if data.sensitive_data_acknowledged else None,
             validation_errors=validation_errors,
+            coach_brief=coach_brief,
         )
 
     def _internal_plan_result(

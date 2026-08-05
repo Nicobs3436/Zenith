@@ -72,6 +72,42 @@ def interview_response(*, include_sensitive: bool = False) -> bytes:
     )
 
 
+def evidence_query_response() -> bytes:
+    return groq_chat_response(
+        {
+            "evidence_queries": [
+                "resistance training hypertrophy volume systematic review meta analysis",
+                "proximity to failure resistance training hypertrophy meta analysis",
+                "protein intake resistance training muscle hypertrophy position stand",
+            ],
+            "rationale": ["Volumen, fallo y proteina son decisiones clave del plan."],
+        }
+    )
+
+
+def fake_evidence() -> dict:
+    return {
+        "search_queries": ["resistance training hypertrophy volume systematic review meta analysis"],
+        "used_references": [
+            {
+                "source": "pubmed",
+                "title": "Resistance training volume enhances muscle hypertrophy",
+                "authors": ["Schoenfeld BJ"],
+                "year": "2017",
+                "journal": "Journal of Sports Sciences",
+                "pmid": "27433992",
+                "doi": "10.1080/example",
+                "abstract": "Systematic review on training volume and hypertrophy.",
+                "query": "resistance training hypertrophy volume systematic review meta analysis",
+                "evidence_level": "solid",
+            }
+        ],
+        "limitations": ["PubMed mock."],
+        "errors": [],
+        "privacy": {"personal_data_sent_to_pubmed": False, "queries_are_neutral": True, "profile_sent_to_pubmed": False},
+    }
+
+
 def sensitive_interview_response() -> bytes:
     return groq_chat_response(
         {
@@ -223,7 +259,8 @@ def test_coach_does_not_store_limitations_without_ack(monkeypatch, client_with_d
 def test_coach_generates_groq_plan_draft(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
     client, session_factory = client_with_db
     seed_exercises(session_factory)
-    use_fake_groq_sequence(monkeypatch, [interview_response(), plan_response(days=4)])
+    use_fake_groq_sequence(monkeypatch, [interview_response(), evidence_query_response(), plan_response(days=4)])
+    monkeypatch.setattr("app.application.coach_service.evidence_search_service.search_many", lambda _queries: fake_evidence())
     token = register_and_login(client, "coach-groq@example.com", "coach_groq")
     complete_coach_profile(client, token)
 
@@ -237,6 +274,8 @@ def test_coach_generates_groq_plan_draft(monkeypatch, client_with_db: tuple[Test
     assert plan["plan_payload"]["schema_version"] == 1
     assert plan["input_summary"]["created_by"] == "coach"
     assert "coach_report" in plan["plan_payload"]
+    assert plan["plan_payload"]["evidence"]["used_references"][0]["pmid"] == "27433992"
+    assert plan["input_summary"]["evidence"]["privacy"]["personal_data_sent_to_pubmed"] is False
 
     state = client.get("/ai/coach", headers=auth_headers(token)).json()
     assert state["phase"] == "plan_draft"

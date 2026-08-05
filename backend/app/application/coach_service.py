@@ -4,13 +4,14 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.application.ai_provider import AiProviderError, CoachInterviewProviderContext, build_ai_provider
+from app.application.ai_provider import AiProviderError, CoachEvidenceQueryProviderContext, CoachInterviewProviderContext, build_ai_provider
 from app.application.ai_training_plan_service import (
     AiTrainingPlanCannotGenerateError,
     AiTrainingPlanNotDraftError,
     AiTrainingPlanNotFoundError,
     ai_training_plan_service,
 )
+from app.application.evidence_search_service import evidence_search_service
 from app.domain.ai import (
     AiTrainingPlanGenerateRequest,
     AiTrainingPlanModifyRequest,
@@ -157,17 +158,19 @@ class CoachService:
             sensitive_data_acknowledged=profile.sensitive_data_acknowledged,
             priorities=self._plan_priorities(profile, state),
         )
+        evidence = self._collect_evidence(profile, state, revision_requested=False)
+        coach_brief = self._coach_brief(profile, state, evidence=evidence)
         try:
             plan = ai_training_plan_service.generate_plan(
                 db,
                 user,
                 request,
                 require_ai_provider=True,
-                coach_brief=self._coach_brief(profile, state),
+                coach_brief=coach_brief,
             )
         except AiTrainingPlanCannotGenerateError as error:
             raise CoachCannotGenerateError(str(error)) from error
-        self._mark_coach_plan(plan, state)
+        self._mark_coach_plan(plan, state, evidence)
         conversation.phase = "plan_draft"
         repository.add_memory(
             user_id=user.id,
@@ -213,6 +216,12 @@ class CoachService:
 
     def revise_plan_draft(self, db: Session, plan_id: UUID, user: User, data: CoachPlanDraftReviseRequest) -> AiTrainingPlan:
         original = self._get_coach_plan(db, plan_id, user.id)
+        repository = CoachRepository(db)
+        profile = repository.get_or_create_profile(user.id)
+        conversation = repository.get_or_create_conversation(user.id)
+        state = self._load_interview_state(conversation)
+        needs_evidence = self._revision_needs_evidence(data.instruction)
+        evidence = self._collect_evidence(profile, state, revision_requested=True) if needs_evidence else dict(original.plan_payload.get("evidence") or {})
         try:
             plan = ai_training_plan_service.modify_plan(
                 db,
@@ -222,6 +231,7 @@ class CoachService:
                     instruction=data.instruction,
                     sensitive_data_acknowledged=data.sensitive_data_acknowledged,
                 ),
+                coach_brief=self._coach_brief(profile, state, evidence=evidence),
             )
         except AiTrainingPlanNotFoundError as error:
             raise CoachPlanNotFoundError from error
@@ -235,7 +245,9 @@ class CoachService:
             "revised_from_plan_id": str(original.id),
             "revision_instruction": data.instruction,
         }
-        plan.plan_payload = {**dict(plan.plan_payload or {}), "source": PLAN_CREATED_BY, "schema_version": 1}
+        if evidence:
+            plan.input_summary["evidence"] = evidence
+        plan.plan_payload = {**dict(plan.plan_payload or {}), "source": PLAN_CREATED_BY, "schema_version": 1, "evidence": evidence}
         db.commit()
         return plan
 
@@ -319,17 +331,19 @@ class CoachService:
     def _is_coach_plan(self, plan: AiTrainingPlan) -> bool:
         return plan.input_summary.get("created_by") == PLAN_CREATED_BY or plan.plan_payload.get("source") == PLAN_CREATED_BY
 
-    def _mark_coach_plan(self, plan: AiTrainingPlan, state: dict[str, Any]) -> None:
+    def _mark_coach_plan(self, plan: AiTrainingPlan, state: dict[str, Any], evidence: dict[str, Any]) -> None:
         plan.input_summary = {
             **dict(plan.input_summary or {}),
             "created_by": PLAN_CREATED_BY,
             "known_facts": self._string_list_state(state, "known_facts"),
             "estimated_fields": self._string_list_state(state, "estimated_fields"),
+            "evidence": evidence,
         }
         plan.plan_payload = {
             **dict(plan.plan_payload or {}),
             "source": PLAN_CREATED_BY,
             "schema_version": 1,
+            "evidence": evidence,
             "scientific_evidence_policy": {
                 "no_fabricated_references": True,
                 "evidence_labels": ["solid", "moderate", "practical"],
@@ -495,13 +509,14 @@ class CoachService:
         priorities.extend([f"datos utiles: {item}" for item in self._string_list_state(state, "known_facts")[:6]])
         return priorities[:20]
 
-    def _coach_brief(self, profile: CoachProfile, state: dict[str, Any]) -> dict[str, Any]:
+    def _coach_brief(self, profile: CoachProfile, state: dict[str, Any], *, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
         return {
             "created_by": PLAN_CREATED_BY,
             "profile": self._profile_snapshot(profile, state),
             "known_facts": self._string_list_state(state, "known_facts"),
             "estimated_fields": self._string_list_state(state, "estimated_fields"),
             "safety_flags": self._string_list_state(state, "safety_flags"),
+            "evidence": evidence or {},
             "requirements": [
                 "Generar vista previa profesional de 8-12 semanas antes de crear rutinas.",
                 "Incluir justificacion cientifica sin inventar referencias.",
@@ -509,6 +524,55 @@ class CoachService:
                 "Permitir ejercicios fuera de base de datos como pendientes hasta aceptar.",
             ],
         }
+
+    def _collect_evidence(self, profile: CoachProfile, state: dict[str, Any], *, revision_requested: bool) -> dict[str, Any]:
+        if revision_requested is False and profile.goal is None:
+            return {"search_queries": [], "used_references": [], "limitations": ["No se busco evidencia porque falta objetivo."], "errors": []}
+        provider = build_ai_provider()
+        context = CoachEvidenceQueryProviderContext(
+            goal=profile.goal or "hypertrophy",
+            plan_focus=self._neutral_plan_focus(profile),
+            revision_requested=revision_requested,
+        )
+        try:
+            query_result = provider.build_coach_evidence_queries(context)
+            queries = query_result.evidence_queries
+            rationale = query_result.rationale
+        except (AttributeError, AiProviderError):
+            queries = self._default_evidence_queries(profile.goal or "hypertrophy")
+            rationale = ["Fallback interno de consultas cientificas neutras."]
+        evidence = evidence_search_service.search_many(queries)
+        evidence["query_rationale"] = rationale
+        evidence["privacy"] = {
+            "personal_data_sent_to_pubmed": False,
+            "queries_are_neutral": True,
+            "profile_sent_to_pubmed": False,
+        }
+        return evidence
+
+    def _neutral_plan_focus(self, profile: CoachProfile) -> list[str]:
+        focus = [profile.goal or "hypertrophy", "volume", "frequency", "repetitions", "proximity to failure", "rest intervals", "progression", "deload", "protein intake"]
+        if profile.experience_level:
+            focus.append(f"{profile.experience_level} trainees")
+        return focus[:12]
+
+    def _revision_needs_evidence(self, instruction: str) -> bool:
+        normalized = instruction.lower()
+        markers = ["evidencia", "cient", "estudio", "referencia", "pubmed", "doi", "pmid", "justifica", "por que", "por qué"]
+        return any(marker in normalized for marker in markers)
+
+    def _default_evidence_queries(self, goal: str) -> list[str]:
+        queries = [
+            "resistance training hypertrophy volume systematic review meta analysis",
+            "resistance training frequency hypertrophy systematic review",
+            "proximity to failure resistance training hypertrophy meta analysis",
+            "rest interval resistance training hypertrophy systematic review",
+            "protein intake resistance training muscle hypertrophy position stand",
+            "resistance training deload fatigue management review",
+        ]
+        if goal == "strength":
+            queries.insert(0, "resistance training strength progression systematic review")
+        return queries[:6]
 
     def _next_action(
         self,

@@ -60,7 +60,6 @@ Cada sugerencia guarda:
 - `POST /ai/coach/messages` persiste perfil estructurado, resumen y ultimos mensajes necesarios; no crea rutinas ni sesiones.
 - `POST /ai/coach/plan-drafts` solo genera una vista previa si el perfil contiene los datos imprescindibles. El plan sigue siendo revisable y solo crea rutinas reales al aceptar.
 - `POST /ai/coach/plan-drafts/{id}/revise` crea una nueva version con trazabilidad; no sobrescribe ni aplica rutinas.
-- Las tablas legacy de Coach V2/intake se conservan hasta fase 2 de limpieza segura de base de datos, pero no forman parte del flujo activo.
 - Generar un resumen post-sesion crea o actualiza `AiSessionSummary`; no modifica sesiones, series ni rutinas.
 - En resumenes post-sesion, Ollama solo puede enriquecer textos/listas del resumen; no aplica cambios.
 

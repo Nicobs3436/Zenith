@@ -52,6 +52,7 @@ class AiTrainingPlanProviderContext:
     exercise_catalog: list[dict[str, Any]] | None = None
     physical_limitations: str | None = None
     validation_errors: list[str] | None = None
+    coach_brief: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -130,6 +131,23 @@ class CoachInterviewProviderResult:
     fallback_used: bool = False
 
 
+@dataclass(frozen=True)
+class CoachEvidenceQueryProviderContext:
+    goal: str
+    plan_focus: list[str]
+    revision_requested: bool = False
+
+
+@dataclass(frozen=True)
+class CoachEvidenceQueryProviderResult:
+    evidence_queries: list[str]
+    rationale: list[str]
+    provider: str
+    model: str | None
+    external_data_sent: bool
+    fallback_used: bool = False
+
+
 class InternalAiProvider:
     provider = "internal"
     model = "rules"
@@ -189,12 +207,35 @@ class InternalAiProvider:
             external_data_sent=self.external_data_sent,
         )
 
+    def build_coach_evidence_queries(self, context: CoachEvidenceQueryProviderContext) -> CoachEvidenceQueryProviderResult:
+        return CoachEvidenceQueryProviderResult(
+            evidence_queries=self._default_evidence_queries(context.goal),
+            rationale=["Consultas base internas para hipertrofia, fuerza y recuperacion."],
+            provider=self.provider,
+            model=self.model,
+            external_data_sent=self.external_data_sent,
+        )
+
     def _confidence_for(self, suggestion_type: str) -> str:
         if suggestion_type in {"increase_weight", "increase_rest"}:
             return "high"
         if suggestion_type in {"reduce_volume", "change_reps", "deload_recommended", "exercise_swap", "routine_goal_adjustment"}:
             return "medium"
         return "low"
+
+    def _default_evidence_queries(self, goal: str) -> list[str]:
+        base = [
+            "resistance training hypertrophy volume systematic review meta analysis",
+            "resistance training frequency hypertrophy systematic review",
+            "proximity to failure resistance training hypertrophy meta analysis",
+            "rest interval resistance training hypertrophy systematic review",
+            "protein intake resistance training muscle hypertrophy position stand",
+            "resistance training deload fatigue management review",
+        ]
+        if goal == "strength":
+            base.insert(0, "resistance training strength progression systematic review")
+        return base[:6]
+
 
 class OllamaAiProvider:
     provider = "ollama"
@@ -340,6 +381,33 @@ class OllamaAiProvider:
 
         return self._parse_coach_interview_response(model_response)
 
+    def build_coach_evidence_queries(self, context: CoachEvidenceQueryProviderContext) -> CoachEvidenceQueryProviderResult:
+        payload = {
+            "model": self.model,
+            "stream": False,
+            "format": "json",
+            "prompt": self._coach_evidence_query_prompt(context),
+        }
+        request = Request(
+            f"{self.base_url}/api/generate",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.timeout_seconds) as response:
+                raw = response.read().decode("utf-8")
+        except (OSError, URLError) as error:
+            raise AiProviderError("Ollama request failed.") from error
+
+        try:
+            parsed = json.loads(raw)
+            model_response = json.loads(parsed.get("response", ""))
+        except (TypeError, ValueError) as error:
+            raise AiProviderError("Ollama returned invalid JSON.") from error
+
+        return self._parse_coach_evidence_query_response(model_response)
+
     def _prompt(self, context: AiProviderContext) -> str:
         safe_context = {
             "suggestion_type": context.suggestion_type,
@@ -393,6 +461,7 @@ class OllamaAiProvider:
             "physical_limitations": context.physical_limitations,
             "modification_instruction": context.modification_instruction,
             "validation_errors_to_fix": context.validation_errors or [],
+            "coach_brief": context.coach_brief,
         }
         return (
             "Eres el entrenador personal de Zenith. Disena el mejor programa posible para el usuario, sin limitarte a una base de datos de ejercicios. "
@@ -411,6 +480,7 @@ class OllamaAiProvider:
             "training_tables_summary, progression_system, warmup, fatigue_and_deload, tracking_template, nutrition_and_recovery, substitutions, mistakes_to_avoid, "
             "scientific_references, next_review_questions. scientific_references debe contener solo referencias reales conocidas y verificables; si no estas seguro, "
             "indica evidencia no concluyente en vez de inventar autores, DOI, PMID o enlaces. Distingue evidence_level solid, moderate o practical. "
+            "Si coach_brief.evidence.used_references existe, usa prioritariamente esas referencias reales y conserva PMID/DOI/titulos exactamente como aparecen. "
             "Contexto estructurado: "
             f"{json.dumps(safe_context, ensure_ascii=False)}"
         )
@@ -495,6 +565,21 @@ class OllamaAiProvider:
             "Bloques de entrevista: 1 datos personales/objetivo; 2 experiencia/rutina/resultados/marcas; 3 disponibilidad/dias/duracion/lugar; "
             "4 equipamiento; 5 preferencias/prioridades; 6 molestias/lesiones; 7 sueno/estres/actividad; 8 nutricion/objetivo temporal; 9 registro/seguimiento. "
             "ready_for_plan solo puede ser true cuando no falte ningun dato imprescindible. Contexto estructurado: "
+            f"{json.dumps(safe_context, ensure_ascii=False)}"
+        )
+
+    def _coach_evidence_query_prompt(self, context: CoachEvidenceQueryProviderContext) -> str:
+        safe_context = {
+            "goal": context.goal,
+            "plan_focus": context.plan_focus[:10],
+            "revision_requested": context.revision_requested,
+        }
+        return (
+            "Genera consultas neutras para PubMed sobre entrenamiento, hipertrofia, fuerza, recuperacion y nutricion. "
+            "No incluyas edad, sexo, peso, lesiones, nombres, emails, datos personales ni informacion identificable. "
+            "Prioriza revisiones sistematicas, metaanalisis, position stands, guias y ensayos controlados. "
+            "Devuelve SOLO JSON valido con keys: evidence_queries, rationale. evidence_queries debe ser array de 4 a 8 strings en ingles. "
+            "Cada consulta debe ser corta, verificable y no comercial. Contexto neutro: "
             f"{json.dumps(safe_context, ensure_ascii=False)}"
         )
 
@@ -608,6 +693,20 @@ class OllamaAiProvider:
             external_data_sent=self.external_data_sent,
         )
 
+    def _parse_coach_evidence_query_response(self, data: Any) -> CoachEvidenceQueryProviderResult:
+        if not isinstance(data, dict):
+            raise AiProviderError("Coach evidence query response is not an object.")
+        queries = self._string_list(data.get("evidence_queries"))
+        if not queries:
+            raise AiProviderError("Coach evidence queries are empty.")
+        return CoachEvidenceQueryProviderResult(
+            evidence_queries=queries[:8],
+            rationale=self._string_list(data.get("rationale")),
+            provider=self.provider,
+            model=self.model,
+            external_data_sent=self.external_data_sent,
+        )
+
     def _text(self, value: Any, *, required: bool = True) -> str | None:
         if value is None and not required:
             return None
@@ -665,6 +764,9 @@ class GroqAiProvider(OllamaAiProvider):
 
     def build_coach_interview_response(self, context: CoachInterviewProviderContext) -> CoachInterviewProviderResult:
         return self._parse_coach_interview_response(self._chat_json(self._coach_interview_prompt(context)))
+
+    def build_coach_evidence_queries(self, context: CoachEvidenceQueryProviderContext) -> CoachEvidenceQueryProviderResult:
+        return self._parse_coach_evidence_query_response(self._chat_json(self._coach_evidence_query_prompt(context)))
 
     def _chat_json(self, prompt: str) -> Any:
         payload = {

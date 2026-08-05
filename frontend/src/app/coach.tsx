@@ -97,6 +97,10 @@ function coachReport(plan: AiTrainingPlan) {
   return asRecord(plan.plan_payload.coach_report);
 }
 
+function evidenceReferences(plan: AiTrainingPlan) {
+  return asRecords(asRecord(plan.plan_payload.evidence).used_references);
+}
+
 function reportText(report: Record<string, unknown>, key: string) {
   const value = report[key];
   if (typeof value === 'string') return value;
@@ -364,6 +368,19 @@ export default function CoachScreen() {
                 ))}
               </View>
             )}
+            {evidenceReferences(plan).length > 0 && (
+              <View style={styles.previewBox}>
+                <Text style={styles.previewTitle}>Evidencia utilizada</Text>
+                {evidenceReferences(plan).slice(0, 8).map((reference, index) => (
+                  <View key={`${plan.id}-evidence-${index}`} style={styles.referenceBox}>
+                    <Text style={styles.exerciseName}>{textValue(reference.title, 'Referencia PubMed')}</Text>
+                    <Text style={styles.cardText}>{asStrings(reference.authors).slice(0, 3).join(', ') || 'Autores no disponibles'} · {textValue(reference.year)} · {textValue(reference.journal)}</Text>
+                    <Text style={styles.note}>PMID {textValue(reference.pmid)}{reference.doi ? ` · DOI ${textValue(reference.doi)}` : ''} · {textValue(reference.evidence_level, 'evidencia')}</Text>
+                    <Text style={styles.cardText}>Usada para: {textValue(reference.query)}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
             {planRoutines(plan).map((routine, index) => (
               <View key={`${plan.id}-routine-${index}`} style={styles.routinePreview}>
                 <Text style={styles.previewTitle}>Dia {textValue(routine.day, String(index + 1))}: {textValue(routine.name, 'Sesion')}</Text>
@@ -442,6 +459,7 @@ const styles = StyleSheet.create({
   previewTitle: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, lineHeight: 20 },
   routinePreview: { backgroundColor: zenith.colors.card, borderColor: zenith.colors.primaryBorder, borderRadius: 14, borderWidth: 1, gap: 8, padding: 12 },
   exercisePreview: { borderColor: zenith.colors.border, borderRadius: 12, borderWidth: 1, gap: 4, padding: 10 },
+  referenceBox: { borderColor: zenith.colors.border, borderRadius: 12, borderWidth: 1, gap: 4, padding: 10 },
   exerciseName: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, lineHeight: 20 },
   note: { color: zenith.colors.cyan, fontFamily: zenith.font.body, lineHeight: 19 },
   risk: { color: '#fca5a5', fontFamily: zenith.font.bodyBold, lineHeight: 20 },

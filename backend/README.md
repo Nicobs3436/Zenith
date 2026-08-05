@@ -133,7 +133,7 @@ API FastAPI para la gestion de rutinas de gimnasio, registros de entrenamiento y
 
 ## Entrenador IA
 
-- La fase actual usa reglas internas/locales, sin proveedor externo y coste 0.
+- La progresion usa reglas internas/locales; Coach usa Groq en staging/produccion y mantiene coste 0 segun cuota gratuita.
 - Puede usar Ollama local opcional con `APP_AI_PROVIDER=ollama`; no es dependencia obligatoria.
 - No usa `notes` como contexto.
 - Genera sugerencias explicables y trazables, incluidos `deload_recommended` ante fatiga acumulada y `exercise_swap` para alternativas compatibles.
@@ -148,12 +148,10 @@ API FastAPI para la gestion de rutinas de gimnasio, registros de entrenamiento y
 - Aceptar un plan adaptativo crea rutinas reales, una por dia disponible.
 - Modificar un plan adaptativo crea una nueva version `draft` con trazabilidad; no cambia el original ni crea rutinas.
 - En planes adaptativos, Ollama puede generar la estructura completa del plan usando el catalogo accesible de ejercicios; el backend valida ids, volumen, rangos, coherencia y privacidad antes de guardar.
-- El chat del entrenador usa `AiCoachIntake`: un unico intake activo por usuario con resumen estructurado, ultimos mensajes necesarios, campos faltantes y estado de preparacion para generar plan.
-- El plan desde chat solo se genera si objetivo, nivel, dias por semana y duracion estan completos; crear el borrador no modifica rutinas hasta aceptarlo.
 - Coach es la experiencia visible del entrenador: usa `CoachProfile`, `CoachConversation`, memoria resumida y borradores revisables.
 - Coach exige objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion y equipamiento para generar una vista previa cientifica revisable.
+- Coach puede buscar evidencia PubMed con consultas neutras y guardar referencias usadas en el borrador; crear el borrador no modifica rutinas hasta aceptarlo.
 - Los resumenes post-sesion devuelven resumen, mejoras, caidas, warnings y proxima recomendacion; no modifican rutinas ni sesiones.
-- Las tablas legacy de Coach V2/intake se mantienen hasta una fase 2 de limpieza de base de datos; no hay endpoints activos para ese flujo.
 - Rechazar una sugerencia no modifica datos de entrenamiento.
 - Las sesiones historicas no se modifican.
 - Las limitaciones fisicas requieren confirmacion explicita porque pueden ser datos sensibles.

@@ -49,10 +49,9 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - Anotaciones por sesion y por ejercicio.
 - IA actual sugiere sobrecarga progresiva, deload inteligente, cambios de ejercicio, ajustes de volumen/reps/descanso, analisis de objetivo por rutina y estancamiento; en planes adaptativos Ollama puede proponer la estructura completa usando el catalogo accesible y backend valida antes de guardar; solo modifica rutinas al aceptar una sugerencia o un plan adaptativo.
 - El entrenador personal puede crear planes adaptativos; con Ollama local la IA propone la estructura y el backend valida ids, volumen, rangos, coherencia y privacidad; al aceptar crea rutinas reales, no sesiones.
-- El chat del entrenador guarda solo resumen estructurado y ultimos mensajes necesarios en `AiCoachIntake`; no genera plan hasta tener objetivo, nivel, dias por semana y duracion.
+- El chat del entrenador guarda perfil/memoria resumida y ultimos mensajes necesarios en `CoachProfile`/`CoachConversation`; no genera plan hasta tener objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion y equipamiento.
 - Coach visible actual usa solo `/ai/coach`: entrevista natural por bloques con Groq, perfil/memoria resumida, exige sexo biologico, edad, altura, peso, objetivo, nivel, dias, duracion y equipamiento para generar vista previa; al aceptar crea rutinas.
 - Los resumenes post-sesion generan resumen, mejoras, caidas, warnings y proxima recomendacion; no modifican rutinas, sesiones ni series.
-- Las tablas legacy de Coach V2/intake se conservan hasta una fase 2 segura de limpieza de base de datos, pero no forman parte del flujo activo.
 
 ## Convenciones
 - Antes de implementar, separar dominio de gimnasio, persistencia, API e integraciones externas.
