@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from app.core.config import Settings, get_settings
@@ -787,6 +787,8 @@ class GroqAiProvider(OllamaAiProvider):
         try:
             with urlopen(request, timeout=self.timeout_seconds) as response:
                 raw = response.read().decode("utf-8")
+        except HTTPError as error:
+            raise AiProviderError(f"Groq request failed with status {error.code}.") from error
         except (OSError, URLError) as error:
             raise AiProviderError("Groq request failed.") from error
 

@@ -1,4 +1,5 @@
 import json
+from urllib.error import HTTPError
 
 from fastapi.testclient import TestClient
 
@@ -35,6 +36,18 @@ def use_fake_groq_sequence(monkeypatch, responses: list[bytes]) -> None:
         if not queue:
             raise AssertionError("Unexpected Groq request")
         return FakeGroqResponse(queue.pop(0))
+
+    monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
+
+
+def use_fake_groq_http_error(monkeypatch, status_code: int) -> None:
+    monkeypatch.setenv("APP_AI_PROVIDER", "groq")
+    monkeypatch.setenv("APP_AI_GROQ_API_KEY", "test-groq-key")
+    monkeypatch.setenv("APP_AI_GROQ_MODEL", "llama-3.1-8b-instant")
+    get_settings.cache_clear()
+
+    def fake_urlopen(_request, timeout):
+        raise HTTPError("https://api.groq.com/openai/v1/chat/completions", status_code, "Forbidden", hdrs=None, fp=None)
 
     monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
 
@@ -272,7 +285,26 @@ def test_coach_message_returns_readable_error_when_groq_fails(monkeypatch, clien
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "Coach AI interview failed."
+    assert response.json()["detail"] == "Groq returned invalid JSON."
+
+
+def test_coach_message_returns_groq_status_when_provider_forbidden(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, _session_factory = client_with_db
+    use_fake_groq_http_error(monkeypatch, 403)
+    token = register_and_login(client, "coach-forbidden@example.com", "coach_forbidden")
+
+    response = client.post(
+        "/ai/coach/messages",
+        headers=auth_headers(token),
+        json={
+            "message": "acepto el aviso, quiero un entrenamiento de fuerza",
+            "personal_data_acknowledged": True,
+            "sensitive_data_acknowledged": True,
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Groq request failed with status 403."
 
 
 def test_coach_generates_groq_plan_draft(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:

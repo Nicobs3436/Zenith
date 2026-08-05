@@ -112,8 +112,10 @@ class CoachService:
         )
         try:
             result = provider.build_coach_interview_response(context)
-        except (AttributeError, AiProviderError) as error:
+        except AttributeError as error:
             raise CoachCannotGenerateError("Coach AI interview failed.") from error
+        except AiProviderError as error:
+            raise CoachCannotGenerateError(str(error)) from error
 
         changed = self._apply_profile_updates(profile, state, result.profile_updates)
         state = self._updated_interview_state(state, result, changed)
