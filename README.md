@@ -14,7 +14,7 @@ MVP funcional con backend FastAPI y frontend Expo Router:
 - Historial y detalle de sesiones.
 - Estadisticas por ejercicio con filtros `7d`, `30d`, `90d` y `all` desde frontend.
 - Rangos por volumen con peso, mejora de 1RM estimado y amplitud de ejercicios progresados.
-- Entrenador IA interno/local con proveedor opcional Ollama local, sugerencias explicables, deload inteligente, cambios de ejercicio, analisis de objetivo por rutina, deduplicacion, expiracion y aplicacion solo al aceptar.
+- Entrenador IA con proveedor `internal` por defecto, `ollama` como opcion local y `groq` como proveedor remoto para Coach V3 en staging/produccion; incluye sugerencias explicables, deload inteligente, cambios de ejercicio, analisis de objetivo por rutina, deduplicacion, expiracion y aplicacion solo al aceptar.
 - Coach como entrenador personal IA conversacional: entrevista natural por bloques, memoria resumida, datos obligatorios para plan, vista previa revisable y creacion de rutinas solo al aceptar.
 - Resumenes IA post-sesion con mejoras, caidas, warnings y proxima recomendacion sin modificar datos.
 - Preguntas guiadas al entrenador IA sin persistencia ni cambios automaticos.
@@ -133,7 +133,7 @@ Antes de escanear el QR, abrir desde el movil `http://192.168.1.44:8000/health`.
 - Borrar una sesion la excluye de historial, estadisticas y rango.
 - El rango se recalcula automaticamente al crear, editar o borrar una sesion.
 - No hay puntos por sesiones registradas ni semanas activas.
-- IA actual usa reglas internas con Ollama local opcional; no usa notas y solo modifica rutinas cuando el usuario acepta una sugerencia o plan validado.
+- La IA admite `internal` como proveedor local por defecto, `ollama` como opcion local y `groq` como proveedor remoto cuando se habilita explicitamente el envio externo de datos; no usa notas y solo modifica rutinas cuando el usuario acepta una sugerencia o plan validado.
 - Coach es la experiencia principal del entrenador; guarda perfil/memoria resumida y ultimos mensajes necesarios, no historial completo.
 - Para generar una vista previa, Coach requiere objetivo, sexo biologico, edad, altura, peso, nivel, dias por semana, duracion y equipamiento.
 - Las limitaciones fisicas opcionales se tratan como dato sensible: requieren confirmacion y no sustituyen consejo medico/profesional.
