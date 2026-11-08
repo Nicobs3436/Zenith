@@ -1,12 +1,21 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 WeightUnit = Literal["kg", "lb"]
+
+
+def _as_utc(value: datetime) -> datetime:
+    # Se guarda en UTC. Algunos motores (SQLite) devuelven fechas sin zona: se declaran UTC para que
+    # la API siempre responda con offset y el cliente pueda reenviarlas sin ambiguedad.
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
+UtcDatetime = Annotated[datetime, AfterValidator(_as_utc)]
 
 # Topes realistas: evitan errores 500 por desbordar Numeric(8,2) y datos absurdos que inflan stats/rango.
 MAX_WEIGHT = Decimal("2500")  # cubre kg y lb (records de prensa en lb)
@@ -77,8 +86,8 @@ class RoutineRead(BaseModel):
     description: str | None
     goal: str | None
     exercises: list[RoutineExerciseRead]
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
 
 class WorkoutSetCreate(BaseModel):
@@ -107,6 +116,12 @@ class WorkoutSessionCreate(BaseModel):
     timezone: str = Field(min_length=1, max_length=80)
     notes: str | None = Field(default=None, max_length=2_000)
     sets: list[WorkoutSetCreate] = Field(default_factory=list, max_length=MAX_SETS_PER_SESSION)
+
+    @field_validator("started_at", "finished_at")
+    @classmethod
+    def normalize_to_utc(cls, value: datetime | None) -> datetime | None:
+        # Guardar siempre en UTC: PostgreSQL convierte solo, pero SQLite descartaria el offset.
+        return value.astimezone(UTC) if value is not None else None
 
     @field_validator("timezone")
     @classmethod
@@ -146,9 +161,9 @@ class WorkoutSessionRead(BaseModel):
     id: UUID
     user_id: UUID
     routine_id: UUID | None
-    started_at: datetime
-    finished_at: datetime | None
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None
     timezone: str
     notes: str | None
     sets: list[WorkoutSetRead]
-    created_at: datetime
+    created_at: UtcDatetime

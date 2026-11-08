@@ -29,7 +29,9 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - `npm run lint` — ejecuta lint del frontend.
 - `npm run test` — ejecuta tests frontend con Vitest.
 - `npx tsc --noEmit` — ejecuta typecheck frontend.
-- Tests frontend actuales cubren helpers de formularios, progresion, formato stats/rank, mensajes auth y cliente API; tests de pantallas todavia no configurados.
+- Tests frontend actuales cubren helpers de formularios, progresion, formato stats/rank, mensajes auth, cliente API, borrador de sesion activa y temporizadores; tests de pantallas todavia no configurados.
+- UI: textos visibles en espanol con tildes; todo `Pressable` con `accessibilityRole`; botones solo-icono con `label`; objetivos tactiles >= 44 px; texto >= 11 px; casillas con `ZenithCheckbox`.
+- Fechas: el backend normaliza `started_at`/`finished_at` a UTC al recibirlas y responde siempre con offset (SQLite descarta zonas).
 - Frontend persiste access y refresh token con `expo-secure-store`; fallback web actual usa `localStorage`.
 - Pendiente backend: typecheck (mypy/pyright) todavia no esta configurado.
 - Deploy fase 20: coste 0 con Render Free para backend Docker, Neon Free para PostgreSQL, Vercel Free para web/PWA, GitHub Actions Free para CI e IA `groq` en staging/produccion para Coach V3 con clave en secreto.

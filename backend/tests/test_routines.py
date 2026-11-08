@@ -699,3 +699,27 @@ def test_create_workout_session_rejects_invalid_timezone_or_naive_dates(
     )
 
     assert response.status_code == 422
+
+
+def test_workout_session_dates_are_returned_with_timezone(client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "started_at": "2026-07-02T18:00:00+02:00",
+        "timezone": "Europe/Madrid",
+        "sets": [{"exercise_id": str(exercise.id), "set_number": 1, "reps": 5}],
+    }
+    created = client.post("/workout-sessions", headers=headers, json=payload).json()
+
+    fetched = client.get(f"/workout-sessions/{created['id']}", headers=headers).json()
+    # Reenviar lo recibido (como hace la pantalla de edicion) debe ser valido.
+    resent = client.put(
+        f"/workout-sessions/{created['id']}",
+        headers=headers,
+        json={"started_at": fetched["started_at"], "timezone": fetched["timezone"], "sets": payload["sets"]},
+    )
+
+    assert fetched["started_at"] in {"2026-07-02T16:00:00Z", "2026-07-02T16:00:00+00:00"}
+    assert resent.status_code == 200
