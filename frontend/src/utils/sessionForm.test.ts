@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Routine } from '@/api/client';
-import { buildWorkoutSets, duplicateSetRow, newSetRow, rowsFromRoutine, SetRow } from './sessionForm';
+import { buildWorkoutSets, duplicateSetRow, newSetRow, rowsFromRoutine, SetRow, toIsoDateTime } from './sessionForm';
 
 function row(overrides: Partial<SetRow> = {}): SetRow {
   return {
@@ -98,5 +98,23 @@ describe('sessionForm', () => {
 
     expect(result.sets).toBeNull();
     expect(result.error).toBe('El RPE de la serie 1 no es valido.');
+  });
+});
+
+describe('decimal and date input normalization', () => {
+  it('accepts comma decimals for weight and RPE', () => {
+    const result = buildWorkoutSets([row({ weight_value: '62,5', rpe: '8,5' })]);
+
+    expect(result.error).toBeNull();
+    expect(result.sets?.[0]).toMatchObject({ weight_value: '62.5', rpe: '8.5' });
+  });
+
+  it('converts local date input to ISO with offset and rejects invalid dates', () => {
+    const iso = toIsoDateTime('2026-07-02 10:00');
+
+    expect(iso).toBe(new Date('2026-07-02T10:00').toISOString());
+    expect(iso?.endsWith('Z')).toBe(true);
+    expect(toIsoDateTime('ayer por la tarde')).toBeNull();
+    expect(toIsoDateTime('   ')).toBeNull();
   });
 });

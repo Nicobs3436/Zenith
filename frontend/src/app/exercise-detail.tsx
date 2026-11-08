@@ -7,7 +7,7 @@ import { Exercise, ExerciseStatsDetail, getExercise, getExerciseStatsDetail } fr
 import { ZenithCard, ZenithHeader, ZenithNotice, ZenithPill } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
-import { buildStatsChart, formatStatsDate, formatStatsPoint } from '@/utils/statsDisplay';
+import { buildStatsChart, formatPeriodDate, formatStatsPoint } from '@/utils/statsDisplay';
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -127,7 +127,7 @@ function StatsPreview({ stats }: { stats: ExerciseStatsDetail }) {
   const latestPoint = stats.points[stats.points.length - 1];
   return (
     <View style={styles.statsPreview}>
-      <Text style={styles.body}>{formatStatsDate(latestPoint.period_start)} · {formatStatsPoint(latestPoint, latestPoint.weight_unit)}</Text>
+      <Text style={styles.body}>{formatPeriodDate(latestPoint.period_start)} · {formatStatsPoint(latestPoint, latestPoint.weight_unit)}</Text>
       <View style={styles.chart}>
         {visibleBars.map((bar, index) => {
           const height = max > 0 ? Math.max(8, Math.round((bar.value / max) * 72)) : 8;

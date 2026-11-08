@@ -94,7 +94,7 @@ class AiTrainingPlanService:
 
     def accept_plan(self, db: Session, plan_id: UUID, user: User) -> AiTrainingPlan:
         repository = AiTrainingPlanRepository(db)
-        plan = repository.get_by_user(plan_id, user.id)
+        plan = repository.get_by_user(plan_id, user.id, for_update=True)
         if plan is None:
             raise AiTrainingPlanNotFoundError
         if plan.status != "draft":

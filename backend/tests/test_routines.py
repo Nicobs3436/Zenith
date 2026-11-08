@@ -658,3 +658,31 @@ def test_create_routine_rejects_unrealistic_target_weight(client_with_db: tuple[
     response = client.post("/routines", headers={"Authorization": f"Bearer {token}"}, json=payload)
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"timezone": "Mars/Olympus"},
+        {"started_at": "2026-07-02T10:00:00"},
+    ],
+)
+def test_create_workout_session_rejects_invalid_timezone_or_naive_dates(
+    client_with_db: tuple[TestClient, SessionFactory], override: dict
+) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+
+    response = client.post(
+        "/workout-sessions",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "started_at": datetime(2026, 7, 2, 10, 0, tzinfo=UTC).isoformat(),
+            "timezone": "Europe/Madrid",
+            "sets": [{"exercise_id": str(exercise.id), "set_number": 1, "reps": 5}],
+            **override,
+        },
+    )
+
+    assert response.status_code == 422

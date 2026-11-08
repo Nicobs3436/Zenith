@@ -59,6 +59,9 @@ class AiTrainingPlanRepository:
         statement = select(AiTrainingPlan).where(AiTrainingPlan.user_id == user_id).order_by(AiTrainingPlan.created_at.desc())
         return list(self.db.scalars(statement).all())
 
-    def get_by_user(self, plan_id: UUID, user_id: UUID) -> AiTrainingPlan | None:
+    def get_by_user(self, plan_id: UUID, user_id: UUID, *, for_update: bool = False) -> AiTrainingPlan | None:
         statement = select(AiTrainingPlan).where(AiTrainingPlan.id == plan_id, AiTrainingPlan.user_id == user_id)
+        if for_update:
+            # Bloquea la fila en PostgreSQL: dos "aceptar" simultaneos no crean rutinas duplicadas.
+            statement = statement.with_for_update()
         return self.db.scalar(statement)

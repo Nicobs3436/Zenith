@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.infrastructure.db.models.user import User
@@ -14,7 +14,8 @@ class UserRepository:
         return self.db.get(User, user_id)
 
     def get_by_email(self, email: str) -> User | None:
-        return self.db.scalar(select(User).where(User.email == email))
+        # lower() tambien cubre cuentas antiguas guardadas con mayusculas.
+        return self.db.scalar(select(User).where(func.lower(User.email) == email.strip().lower()))
 
     def get_by_username(self, username: str) -> User | None:
         return self.db.scalar(select(User).where(User.username == username))

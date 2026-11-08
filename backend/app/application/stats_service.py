@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from functools import lru_cache
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,19 @@ from app.infrastructure.db.repositories.exercises import ExerciseRepository
 from app.infrastructure.db.repositories.stats import StatsRepository, StatsRow
 
 TWO_PLACES = Decimal("0.01")
+# Epley solo es razonablemente fiable en series cortas; fuera de 1-12 reps no se estima 1RM.
+E1RM_MIN_REPS = 1
+E1RM_MAX_REPS = 12
+
+
+def estimate_1rm(weight: Decimal | None, reps: int) -> Decimal | None:
+    """1RM estimado (Epley). None si no hay peso o las reps estan fuera del rango fiable."""
+    if weight is None or reps < E1RM_MIN_REPS or reps > E1RM_MAX_REPS:
+        return None
+    weight = Decimal(weight)
+    if reps == 1:
+        return weight
+    return weight * (Decimal("1") + (Decimal(reps) / Decimal("30")))
 
 
 class StatsNotFoundError(Exception):
@@ -58,11 +73,14 @@ class StatsAccumulator:
         self.weighted_sets += 1
         self.weight_sum += weight
         self.total_volume += weight * workout_set.reps
-        self.max_weight = weight if self.max_weight is None else max(self.max_weight, weight)
-        estimated_1rm = weight * (Decimal("1") + (Decimal(workout_set.reps) / Decimal("30")))
-        self.best_estimated_1rm = (
-            estimated_1rm if self.best_estimated_1rm is None else max(self.best_estimated_1rm, estimated_1rm)
-        )
+        if workout_set.reps > 0:
+            # Una serie con 0 reps es un intento fallido: no cuenta como peso maximo levantado.
+            self.max_weight = weight if self.max_weight is None else max(self.max_weight, weight)
+        estimated_1rm = estimate_1rm(weight, workout_set.reps)
+        if estimated_1rm is not None:
+            self.best_estimated_1rm = (
+                estimated_1rm if self.best_estimated_1rm is None else max(self.best_estimated_1rm, estimated_1rm)
+            )
 
     def to_summary(self) -> ExerciseStatsSummary:
         return ExerciseStatsSummary(
@@ -104,14 +122,66 @@ def quantize_or_none(value: Decimal | None) -> Decimal | None:
     return value.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
 
 
-def period_start_for(value: datetime, period: StatsPeriod) -> datetime:
-    value = ensure_utc(value)
-    if period == "day":
-        return value.replace(hour=0, minute=0, second=0, microsecond=0)
+@lru_cache(maxsize=128)
+def _zone(name: str | None) -> ZoneInfo:
+    try:
+        return ZoneInfo(name) if name else ZoneInfo("UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        return ZoneInfo("UTC")
+
+
+def local_date(value: datetime, timezone_name: str | None) -> date:
+    return ensure_utc(value).astimezone(_zone(timezone_name)).date()
+
+
+def period_start_for(value: datetime, period: StatsPeriod, timezone_name: str | None = None) -> datetime:
+    """Inicio del periodo segun el calendario local de la sesion.
+
+    Se devuelve como medianoche UTC de esa fecha local: es una etiqueta de calendario, no un instante.
+    El frontend la formatea con timeZone UTC.
+    """
+    day = local_date(value, timezone_name)
     if period == "week":
-        start = value.replace(hour=0, minute=0, second=0, microsecond=0)
-        return start - timedelta(days=start.weekday())
-    return value.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        day = day - timedelta(days=day.weekday())
+    elif period == "month":
+        day = day.replace(day=1)
+    return datetime(day.year, day.month, day.day, tzinfo=UTC)
+
+
+def count_personal_records(
+    rows: list[StatsRow], start_date: datetime | None = None, end_date: datetime | None = None
+) -> int:
+    """Cuenta sesiones en las que se supera el peso maximo previo de un ejercicio/unidad.
+
+    La primera sesion de cada ejercicio/unidad es la marca de referencia, no un record.
+    Solo cuentan series con peso y al menos 1 rep. kg y lb son grupos separados.
+    """
+    session_best: dict[tuple[UUID, str, UUID], tuple[datetime, Decimal]] = {}
+    for workout_set, session, _exercise in rows:
+        if workout_set.weight_value is None or workout_set.weight_unit is None or workout_set.reps < 1:
+            continue
+        key = (workout_set.exercise_id, workout_set.weight_unit, session.id)
+        weight = Decimal(workout_set.weight_value)
+        current = session_best.get(key)
+        if current is None or weight > current[1]:
+            session_best[key] = (ensure_utc(session.started_at), weight)
+
+    by_group: dict[tuple[UUID, str], list[tuple[datetime, Decimal]]] = {}
+    for (exercise_id, unit, _session_id), value in session_best.items():
+        by_group.setdefault((exercise_id, unit), []).append(value)
+
+    start = ensure_utc(start_date) if start_date else None
+    end = ensure_utc(end_date) if end_date else None
+    records = 0
+    for sessions in by_group.values():
+        sessions.sort(key=lambda item: item[0])
+        best_so_far = sessions[0][1]
+        for started_at, weight in sessions[1:]:
+            if weight > best_so_far:
+                best_so_far = weight
+                if (start is None or started_at >= start) and (end is None or started_at <= end):
+                    records += 1
+    return records
 
 
 def row_weight_unit(row: StatsRow) -> str | None:
@@ -178,7 +248,7 @@ class StatsService:
         for row in rows:
             workout_set, session, _exercise = row
             unit = row_weight_unit(row)
-            period_start = period_start_for(session.started_at, period)
+            period_start = period_start_for(session.started_at, period, session.timezone)
             key = (period_start, unit)
             groups.setdefault(
                 key,
@@ -222,7 +292,7 @@ class StatsService:
             if workout_set.weight_value is not None:
                 volume_by_unit[unit] = volume_by_unit.get(unit, Decimal("0")) + Decimal(workout_set.weight_value) * workout_set.reps
 
-            period_start = period_start_for(session.started_at, period)
+            period_start = period_start_for(session.started_at, period, session.timezone)
             period_key = (period_start, unit)
             period_groups.setdefault(period_key, StatsOverviewAccumulator(period_start=period_start, weight_unit=unit)).add(row)
 
@@ -242,6 +312,12 @@ class StatsService:
                 ),
             ).add(row)
 
+        if start_date is None and end_date is None:
+            history_rows = rows
+        else:
+            history_rows = filter_rows_by_weight_unit(StatsRepository(db).list_workout_sets(user_id=user.id), weight_unit)
+        pr_count = count_personal_records(history_rows, start_date, end_date)
+
         top_exercises = [to_top_exercise(group) for group in exercises.values()]
         top_exercises.sort(key=top_exercise_sort_key)
 
@@ -251,7 +327,7 @@ class StatsService:
                 total_sets=len(rows),
                 session_count=len(sessions),
                 training_hours=quantize_or_none(Decimal(training_seconds) / Decimal("3600")) or Decimal("0.00"),
-                pr_count=sum(1 for group in exercises.values() if group.max_weight is not None),
+                pr_count=pr_count,
             ),
             volume_by_unit=[
                 StatsVolumeByUnit(weight_unit=unit, total_volume=quantize_or_none(total))

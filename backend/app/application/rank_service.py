@@ -1,8 +1,10 @@
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy.orm import Session
 
+from app.application.stats_service import ensure_utc, estimate_1rm
 from app.domain.ranks import UserRankRead
 from app.infrastructure.db.models.rank import Rank
 from app.infrastructure.db.models.user import User
@@ -10,6 +12,9 @@ from app.infrastructure.db.repositories.ranks import RankRepository
 from app.infrastructure.db.repositories.stats import StatsRepository, StatsRow
 
 TWO_PLACES = Decimal("0.01")
+# Decision explicita (docs/data-model.md): solo para puntuar el rango, el volumen en lb se normaliza a kg.
+# Las estadisticas visibles siguen separando kg y lb sin convertir.
+LB_TO_KG = Decimal("0.45359237")
 
 
 @dataclass
@@ -26,10 +31,7 @@ def quantize(value: Decimal) -> Decimal:
 
 def estimated_1rm(row: StatsRow) -> Decimal | None:
     workout_set, _session, _exercise = row
-    if workout_set.weight_value is None:
-        return None
-    weight = Decimal(workout_set.weight_value)
-    return weight * (Decimal("1") + (Decimal(workout_set.reps) / Decimal("30")))
+    return estimate_1rm(workout_set.weight_value, workout_set.reps)
 
 
 class RankService:
@@ -97,7 +99,10 @@ class RankService:
         total_volume = Decimal("0")
         for row in rows:
             workout_set, _session, _exercise = row
-            total_volume += Decimal(workout_set.weight_value) * Decimal(workout_set.reps)
+            volume = Decimal(workout_set.weight_value) * Decimal(workout_set.reps)
+            if workout_set.weight_unit == "lb":
+                volume *= LB_TO_KG
+            total_volume += volume
         return total_volume / Decimal("100")
 
     def _calculate_progression_scores(self, rows: list[StatsRow]) -> tuple[Decimal, Decimal]:
@@ -111,12 +116,22 @@ class RankService:
         progression_score = Decimal("0")
         progressed_groups = 0
         for group_rows in grouped.values():
-            group_rows.sort(key=lambda row: (row[1].started_at, row[0].set_number))
-            estimates = [value for row in group_rows if (value := estimated_1rm(row)) is not None]
-            if not estimates or estimates[0] <= 0:
+            # Referencia = mejor 1RM estimado de la primera sesion (no su primera serie, que suele ser
+            # de calentamiento). Progreso = mejor 1RM estimado en sesiones posteriores.
+            per_session: dict[object, tuple[datetime, Decimal]] = {}
+            for row in group_rows:
+                value = estimated_1rm(row)
+                if value is None:
+                    continue
+                session = row[1]
+                current = per_session.get(session.id)
+                if current is None or value > current[1]:
+                    per_session[session.id] = (ensure_utc(session.started_at), value)
+            ordered = sorted(per_session.values(), key=lambda item: item[0])
+            if len(ordered) < 2 or ordered[0][1] <= 0:
                 continue
-            first = estimates[0]
-            best = max(estimates)
+            first = ordered[0][1]
+            best = max(value for _started_at, value in ordered[1:])
             if best <= first:
                 continue
 

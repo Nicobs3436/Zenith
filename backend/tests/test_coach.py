@@ -440,3 +440,23 @@ def test_coach_generates_groq_plan_draft(monkeypatch, client_with_db: tuple[Test
     state = client.get("/ai/coach", headers=auth_headers(token)).json()
     assert state["phase"] == "plan_draft"
     assert len(state["draft_plans"]) == 1
+
+
+def test_coach_ignores_malformed_list_updates_instead_of_erasing_them(
+    monkeypatch, client_with_db: tuple[TestClient, SessionFactory]
+) -> None:
+    client, _session_factory = client_with_db
+    malformed = json.loads(json.loads(empty_interview_response())["choices"][0]["message"]["content"])
+    malformed["profile_updates"] = {"equipment": "gimnasio completo"}
+    use_fake_groq_sequence(monkeypatch, [interview_response(), groq_chat_response(malformed)])
+    token = register_and_login(client, "coach-lists@example.com", "coach_lists")
+    complete_coach_profile(client, token)
+
+    response = client.post(
+        "/ai/coach/messages",
+        headers=auth_headers(token),
+        json={"message": "Sigo con el mismo material.", "personal_data_acknowledged": True},
+    )
+
+    assert response.status_code == 200
+    assert "mancuernas" in response.json()["profile"]["equipment"]

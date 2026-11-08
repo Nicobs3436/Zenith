@@ -5,8 +5,9 @@
 - Base de datos: PostgreSQL.
 - Identificadores principales con UUID.
 - Pesos con valor numerico y unidad explicita.
-- `kg` y `lb` no se convierten automaticamente.
-- Fechas de sesiones con `started_at`, `finished_at` y `timezone` explicita.
+- `kg` y `lb` no se convierten automaticamente en estadisticas visibles. Unica excepcion documentada: la puntuacion de rango normaliza lb a kg (ver Rangos).
+- Fechas de sesiones con `started_at`, `finished_at` (con offset obligatorio) y `timezone` IANA validada.
+- Emails normalizados en minusculas; login y registro no distinguen mayusculas.
 - Borrado normal mediante soft delete en rutinas y sesiones.
 
 ## Entidades
@@ -127,16 +128,19 @@
 - `total_sets`: cantidad de series.
 - `total_reps`: suma de repeticiones.
 - `total_volume`: `sum(reps * weight_value)` para series con peso.
-- `max_weight`: peso maximo por ejercicio/unidad.
+- `max_weight`: peso maximo por ejercicio/unidad; las series de 0 reps (intentos fallidos) no cuentan.
 - `avg_weight`: promedio de peso por ejercicio/unidad.
-- `best_estimated_1rm`: mejor estimacion usando formula de Epley.
+- `best_estimated_1rm`: mejor estimacion Epley, solo con series de 1 a 12 reps (1 rep = el propio peso).
+- `pr_count`: sesiones del periodo en las que se supera el peso maximo previo de un ejercicio/unidad; la primera sesion de cada ejercicio es la referencia, no un record.
+- Agrupacion dia/semana/mes segun el calendario local (`timezone`) de cada sesion. `period_start` es la fecha local a medianoche UTC (etiqueta de calendario); el frontend la formatea en UTC.
 - Series sin peso cuentan para sets/reps y no para volumen/carga/1RM.
 - Unidades se agrupan separadas hasta definir una politica explicita de conversion.
 
 ## Rangos
 
-- Volumen: volumen total con peso dividido por 100.
-- Progresion: mejora porcentual de 1RM estimado por ejercicio y unidad.
+- Volumen: volumen total con peso dividido por 100. Solo para esta puntuacion, el volumen en lb se multiplica por 0.45359237 para no sumar kg y lb en bruto.
+- Progresion: mejora porcentual entre el mejor 1RM estimado de la primera sesion (no su primera serie, que suele ser calentamiento) y el mejor de sesiones posteriores, por ejercicio y unidad.
+- Topes de validacion (peso <= 2500, reps <= 1000, <= 300 series por sesion) impiden inflar el rango con datos absurdos.
 - Amplitud: puntos por cantidad de ejercicios/unidad con progreso.
 - Sesiones borradas no participan.
 

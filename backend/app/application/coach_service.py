@@ -477,9 +477,10 @@ class CoachService:
             return value.strip()[:1_000] if isinstance(value, str) and value.strip() else _SKIP
         return _SKIP
 
-    def _clean_list(self, value: Any) -> list[str]:
+    def _clean_list(self, value: Any):
         if not isinstance(value, list):
-            return []
+            # Respuesta de IA mal formada: ignorarla en vez de borrar el dato ya guardado.
+            return _SKIP
         cleaned: list[str] = []
         for item in value[:20]:
             if isinstance(item, str) and item.strip():
@@ -672,7 +673,8 @@ class CoachService:
         return "continue_interview"
 
     def _string_list_state(self, state: dict[str, Any], key: str) -> list[str]:
-        return self._clean_list(state.get(key) or [])
+        cleaned = self._clean_list(state.get(key) or [])
+        return [] if cleaned is _SKIP else cleaned
 
     def _merge_unique(self, first: list[str], second: list[str]) -> list[str]:
         merged: list[str] = []

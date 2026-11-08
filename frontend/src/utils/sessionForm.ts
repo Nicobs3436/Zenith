@@ -52,12 +52,28 @@ export function rowsFromRoutine(routine: Routine): SetRow[] {
     });
 }
 
+// Acepta coma decimal (teclados en espanol): "62,5" -> 62.5.
+export function normalizeDecimalInput(value: string) {
+  return value.trim().replace(',', '.');
+}
+
+// Convierte la fecha escrita por el usuario a ISO con zona. Sin offset se interpreta como hora local
+// del dispositivo (lo que el usuario ve), nunca como UTC silencioso. Devuelve null si no es valida.
+export function toIsoDateTime(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const parsed = new Date(trimmed.includes('T') || !trimmed.includes(' ') ? trimmed : trimmed.replace(' ', 'T'));
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 // Mismos topes que el backend (backend/app/domain/routines.py).
 const MAX_WEIGHT = 2500;
 const MAX_REPS = 1000;
 
 function parseOptionalNumber(value: string, label: string, min: number, max?: number) {
-  const trimmed = value.trim();
+  const trimmed = normalizeDecimalInput(value);
   if (!trimmed) {
     return { value: null, error: null };
   }
@@ -117,8 +133,8 @@ export function buildWorkoutSets(rows: SetRow[]): BuildSetsResult {
       exercise_id: row.exercise_id,
       set_number: index + 1,
       reps,
-      ...(weight.value !== null ? { weight_value: row.weight_value.trim(), weight_unit: row.weight_unit } : {}),
-      ...(rpe.value !== null ? { rpe: row.rpe.trim() } : {}),
+      ...(weight.value !== null ? { weight_value: normalizeDecimalInput(row.weight_value), weight_unit: row.weight_unit } : {}),
+      ...(rpe.value !== null ? { rpe: normalizeDecimalInput(row.rpe) } : {}),
       ...(rir.value !== null ? { rir: rir.value } : {}),
       ...(restSeconds.value !== null ? { rest_seconds: restSeconds.value } : {}),
       ...(row.notes.trim() ? { notes: row.notes.trim() } : {}),

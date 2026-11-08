@@ -10,7 +10,7 @@ import { SegmentedField } from '@/components/SegmentedField';
 import { ZenithCard, ZenithHeader, ZenithNotice } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
-import { buildWorkoutSets, duplicateSetRow, newSetRow, SetRow, WeightUnit } from '@/utils/sessionForm';
+import { buildWorkoutSets, duplicateSetRow, newSetRow, SetRow, toIsoDateTime, WeightUnit } from '@/utils/sessionForm';
 
 const UNIT_OPTIONS = [
   { label: 'kg', value: 'kg' },
@@ -98,8 +98,14 @@ export default function EditSessionScreen() {
       setError('Sesion no encontrada.');
       return;
     }
-    if (!startedAt.trim()) {
-      setError('La fecha de inicio es obligatoria.');
+    const startedAtIso = toIsoDateTime(startedAt);
+    if (!startedAtIso) {
+      setError('La fecha de inicio no es valida. Usa el formato AAAA-MM-DD HH:MM.');
+      return;
+    }
+    const finishedAtIso = finishedAt.trim() ? toIsoDateTime(finishedAt) : null;
+    if (finishedAt.trim() && !finishedAtIso) {
+      setError('La fecha de fin no es valida. Usa el formato AAAA-MM-DD HH:MM.');
       return;
     }
     if (!timezone.trim()) {
@@ -122,8 +128,8 @@ export default function EditSessionScreen() {
     try {
       await updateWorkoutSession(id, {
         routine_id: routineId || null,
-        started_at: startedAt,
-        finished_at: finishedAt.trim() || null,
+        started_at: startedAtIso,
+        finished_at: finishedAtIso,
         timezone,
         notes: notes.trim() || null,
         sets: result.sets,

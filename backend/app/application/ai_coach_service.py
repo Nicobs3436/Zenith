@@ -164,7 +164,7 @@ class AiCoachService:
 
     def accept_suggestion(self, db: Session, suggestion_id: UUID, user: User) -> AiSuggestion:
         repository = AiSuggestionRepository(db)
-        suggestion = repository.get_by_user(suggestion_id, user.id)
+        suggestion = repository.get_by_user(suggestion_id, user.id, for_update=True)
         if suggestion is None:
             raise AiSuggestionNotFoundError
         if suggestion.status != "pending":

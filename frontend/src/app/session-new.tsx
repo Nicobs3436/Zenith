@@ -10,7 +10,7 @@ import { SegmentedField } from '@/components/SegmentedField';
 import { ZenithCard, ZenithHeader, ZenithNotice } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
-import { buildWorkoutSets, duplicateSetRow, newSetRow, rowsFromRoutine, SetRow, WeightUnit } from '@/utils/sessionForm';
+import { buildWorkoutSets, duplicateSetRow, newSetRow, rowsFromRoutine, SetRow, toIsoDateTime, WeightUnit } from '@/utils/sessionForm';
 
 const UNIT_OPTIONS = [
   { label: 'kg', value: 'kg' },
@@ -79,8 +79,9 @@ export default function NewSessionScreen() {
   }
 
   async function submit() {
-    if (!startedAt.trim()) {
-      setError('La fecha de inicio es obligatoria.');
+    const startedAtIso = toIsoDateTime(startedAt);
+    if (!startedAtIso) {
+      setError('La fecha de inicio no es valida. Usa el formato AAAA-MM-DD HH:MM.');
       return;
     }
     if (!timezone.trim()) {
@@ -103,7 +104,7 @@ export default function NewSessionScreen() {
     try {
       await createWorkoutSession({
         routine_id: routineId || null,
-        started_at: startedAt,
+        started_at: startedAtIso,
         timezone,
         notes: notes.trim() || null,
         sets: result.sets,

@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.infrastructure.db.models.exercise import Exercise
 from app.infrastructure.db.models.workout import WorkoutSession, WorkoutSet
@@ -28,6 +28,7 @@ class StatsRepository:
             .join(WorkoutSession, WorkoutSet.session_id == WorkoutSession.id)
             .join(Exercise, WorkoutSet.exercise_id == Exercise.id)
             .where(WorkoutSession.user_id == user_id, WorkoutSession.deleted_at.is_(None))
+            .options(selectinload(Exercise.muscle_groups))
             .order_by(Exercise.name, WorkoutSession.started_at, WorkoutSet.set_number)
         )
         if exercise_id is not None:

@@ -20,7 +20,7 @@ import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
 import {
   buildMetricStatsChart,
-  formatStatsDate,
+  formatPeriodDate,
   formatStatsDateRange,
   formatMetricStatsPoint,
   formatStatsUnit,
@@ -387,7 +387,7 @@ function StatsDetail({ metric, onMetricChange, points, unit }: { metric: StatsCh
       <View style={styles.pointsList}>
         {visiblePoints.map((point) => (
           <View key={`${point.period_start}-${point.weight_unit ?? 'bodyweight'}`} style={styles.pointRow}>
-            <Text style={styles.pointDate}>{formatStatsDate(point.period_start)}</Text>
+            <Text style={styles.pointDate}>{formatPeriodDate(point.period_start)}</Text>
             <Text style={styles.pointValue}>{formatMetricStatsPoint(point, metric, unit)}</Text>
           </View>
         ))}
@@ -482,7 +482,7 @@ function formatOverviewVolume(overview: StatsOverview) {
 
 function chartLabel(periodStart: string, weightUnit: string | null) {
   const unit = weightUnit ? ` ${weightUnit}` : '';
-  return `${formatStatsDate(periodStart)}${unit}`;
+  return `${formatPeriodDate(periodStart)}${unit}`;
 }
 
 const styles = StyleSheet.create({
