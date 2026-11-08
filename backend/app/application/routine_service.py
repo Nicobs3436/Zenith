@@ -145,7 +145,14 @@ class RoutineService:
         if session is None:
             return None
 
-        if data.routine_id is not None and routine_repository.get_by_user(data.routine_id, user.id) is None:
+        # Mantener el routine_id original esta permitido aunque la rutina se haya borrado (soft delete):
+        # el historial conserva su vinculo. Solo se valida al cambiarlo por otra rutina.
+        routine_changed = data.routine_id != session.routine_id
+        if (
+            routine_changed
+            and data.routine_id is not None
+            and routine_repository.get_by_user(data.routine_id, user.id) is None
+        ):
             raise RoutineReferenceError("routine_id")
 
         for workout_set in data.sets:

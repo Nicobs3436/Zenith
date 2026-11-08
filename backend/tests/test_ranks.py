@@ -355,7 +355,7 @@ def test_rank_response_returns_no_next_rank_at_max_rank(
         token,
         str(exercise.id),
         datetime(2026, 7, 2, 10, 0, tzinfo=UTC),
-        [{"set_number": 1, "reps": 100, "weight_value": "10000", "weight_unit": "kg"}],
+        [{"set_number": n, "reps": 100, "weight_value": "2500", "weight_unit": "kg"} for n in range(1, 5)],
     )
 
     response = client.get("/users/me/rank", headers={"Authorization": f"Bearer {token}"})

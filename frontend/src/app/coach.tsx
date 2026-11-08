@@ -152,6 +152,10 @@ export default function CoachScreen() {
   async function submitMessage() {
     const text = message.trim();
     if (!text) return;
+    if (!personalAck) {
+      setError('Confirma el uso de datos personales antes de escribir al Coach.');
+      return;
+    }
     setSending(true);
     setError(null);
     setNotice(null);
@@ -293,7 +297,7 @@ export default function CoachScreen() {
           </View>
           <Field label="Habla con tu Coach" multiline maxLength={1500} onChangeText={setMessage} placeholder="Ej: acepto el aviso. Tengo 29 anos, 180 cm, 80 kg, quiero hipertrofia, soy intermedio, 4 dias, 60 min, gimnasio completo..." value={message} />
           <View style={styles.actions}>
-            <ZenithButton disabled={sending || !message.trim()} onPress={submitMessage} title={sending ? 'Enviando...' : 'Enviar mensaje'} />
+            <ZenithButton disabled={sending || !message.trim() || !personalAck} onPress={submitMessage} title={sending ? 'Enviando...' : 'Enviar mensaje'} />
             <Pressable disabled={!state.ready_for_plan || generating} onPress={submitGeneratePlan} style={[styles.primaryAction, (!state.ready_for_plan || generating) && styles.disabled]}>
               <Sparkles color={zenith.colors.primaryForeground} size={14} />
               <Text style={styles.primaryActionText}>{generating ? 'Creando vista previa...' : 'Generar vista previa'}</Text>

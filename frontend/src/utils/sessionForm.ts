@@ -52,6 +52,10 @@ export function rowsFromRoutine(routine: Routine): SetRow[] {
     });
 }
 
+// Mismos topes que el backend (backend/app/domain/routines.py).
+const MAX_WEIGHT = 2500;
+const MAX_REPS = 1000;
+
 function parseOptionalNumber(value: string, label: string, min: number, max?: number) {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -85,11 +89,11 @@ export function buildWorkoutSets(rows: SetRow[]): BuildSetsResult {
     }
 
     const reps = Number(row.reps.trim());
-    if (!Number.isInteger(reps) || reps < 0) {
+    if (!Number.isInteger(reps) || reps < 0 || reps > MAX_REPS) {
       return { sets: null, error: `Las reps de la serie ${index + 1} no son validas.` };
     }
 
-    const weight = parseOptionalNumber(row.weight_value, `El peso de la serie ${index + 1}`, 0);
+    const weight = parseOptionalNumber(row.weight_value, `El peso de la serie ${index + 1}`, 0, MAX_WEIGHT);
     if (weight.error) {
       return { sets: null, error: weight.error };
     }

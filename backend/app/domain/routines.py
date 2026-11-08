@@ -7,18 +7,27 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 WeightUnit = Literal["kg", "lb"]
 
+# Topes realistas: evitan errores 500 por desbordar Numeric(8,2) y datos absurdos que inflan stats/rango.
+MAX_WEIGHT = Decimal("2500")  # cubre kg y lb (records de prensa en lb)
+MAX_REPS = 1_000
+MAX_SETS_PER_SESSION = 300
+MAX_EXERCISES_PER_ROUTINE = 50
+MAX_TARGET_SETS = 20
+MAX_RIR = 20
+MAX_REST_SECONDS = 3_600
+
 
 class RoutineExerciseCreate(BaseModel):
     exercise_id: UUID
-    position: int = Field(ge=1)
-    target_sets: int | None = Field(default=None, ge=1)
-    target_reps_min: int | None = Field(default=None, ge=0)
-    target_reps_max: int | None = Field(default=None, ge=0)
-    target_weight_value: Decimal | None = Field(default=None, ge=0)
+    position: int = Field(ge=1, le=MAX_EXERCISES_PER_ROUTINE)
+    target_sets: int | None = Field(default=None, ge=1, le=MAX_TARGET_SETS)
+    target_reps_min: int | None = Field(default=None, ge=0, le=MAX_REPS)
+    target_reps_max: int | None = Field(default=None, ge=0, le=MAX_REPS)
+    target_weight_value: Decimal | None = Field(default=None, ge=0, le=MAX_WEIGHT, decimal_places=2)
     target_weight_unit: WeightUnit | None = None
-    target_rpe: Decimal | None = Field(default=None, ge=1, le=10)
-    target_rir: int | None = Field(default=None, ge=0)
-    rest_seconds: int | None = Field(default=None, ge=0)
+    target_rpe: Decimal | None = Field(default=None, ge=1, le=10, decimal_places=1)
+    target_rir: int | None = Field(default=None, ge=0, le=MAX_RIR)
+    rest_seconds: int | None = Field(default=None, ge=0, le=MAX_REST_SECONDS)
     notes: str | None = Field(default=None, max_length=2_000)
 
     @model_validator(mode="after")
@@ -38,7 +47,7 @@ class RoutineCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     description: str | None = Field(default=None, max_length=2_000)
     goal: str | None = Field(default=None, max_length=120)
-    exercises: list[RoutineExerciseCreate] = Field(min_length=1)
+    exercises: list[RoutineExerciseCreate] = Field(min_length=1, max_length=MAX_EXERCISES_PER_ROUTINE)
 
 
 class RoutineExerciseRead(BaseModel):
@@ -73,13 +82,13 @@ class RoutineRead(BaseModel):
 
 class WorkoutSetCreate(BaseModel):
     exercise_id: UUID
-    set_number: int = Field(ge=1)
-    reps: int = Field(ge=0)
-    weight_value: Decimal | None = Field(default=None, ge=0)
+    set_number: int = Field(ge=1, le=MAX_SETS_PER_SESSION)
+    reps: int = Field(ge=0, le=MAX_REPS)
+    weight_value: Decimal | None = Field(default=None, ge=0, le=MAX_WEIGHT, decimal_places=2)
     weight_unit: WeightUnit | None = None
-    rpe: Decimal | None = Field(default=None, ge=1, le=10)
-    rir: int | None = Field(default=None, ge=0)
-    rest_seconds: int | None = Field(default=None, ge=0)
+    rpe: Decimal | None = Field(default=None, ge=1, le=10, decimal_places=1)
+    rir: int | None = Field(default=None, ge=0, le=MAX_RIR)
+    rest_seconds: int | None = Field(default=None, ge=0, le=MAX_REST_SECONDS)
     notes: str | None = Field(default=None, max_length=2_000)
 
     @model_validator(mode="after")
@@ -95,7 +104,7 @@ class WorkoutSessionCreate(BaseModel):
     finished_at: datetime | None = None
     timezone: str = Field(min_length=1, max_length=80)
     notes: str | None = Field(default=None, max_length=2_000)
-    sets: list[WorkoutSetCreate] = Field(default_factory=list)
+    sets: list[WorkoutSetCreate] = Field(default_factory=list, max_length=MAX_SETS_PER_SESSION)
 
     @model_validator(mode="after")
     def validate_finished_at(self) -> "WorkoutSessionCreate":

@@ -8,12 +8,15 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   auth?: boolean;
+  timeoutMs?: number;
 };
 
 type ApiErrorDetail = string | { msg?: string; loc?: (string | number)[] }[] | { detail?: unknown };
 type ApiValidationError = { msg?: string; loc?: (string | number)[] };
 
 const API_TIMEOUT_MS = 20_000;
+// Endpoints que llaman a la IA: el backend puede encadenar varias llamadas a Groq con reintentos.
+export const AI_TIMEOUT_MS = 120_000;
 const API_TIMEOUT_MESSAGE = 'La API tardo demasiado en responder. Intentalo de nuevo.';
 
 type TokenResponse = {
@@ -22,6 +25,16 @@ type TokenResponse = {
 };
 
 let refreshInFlight: Promise<boolean> | null = null;
+
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
 
 export class AuthExpiredError extends Error {
   constructor() {
@@ -519,7 +532,7 @@ async function request<T>(path: string, options: RequestOptions = {}, retryOnUna
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? API_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
@@ -545,7 +558,7 @@ async function request<T>(path: string, options: RequestOptions = {}, retryOnUna
       await expireSession();
       throw new AuthExpiredError();
     }
-    throw new Error(await formatErrorMessage(response));
+    throw new ApiError(await formatErrorMessage(response), response.status);
   }
 
   if (response.status === 204) {
@@ -583,8 +596,13 @@ async function refreshAccessToken() {
     );
     await setAuthTokens({ accessToken: token.access_token, refreshToken: token.refresh_token });
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    // Solo un rechazo explicito del backend (4xx) invalida la sesion. Errores de red, timeouts o 5xx
+    // se propagan para no cerrar sesion por mala cobertura; los tokens se conservan para reintentar.
+    if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+      return false;
+    }
+    throw error;
   }
 }
 
@@ -753,7 +771,7 @@ export function deleteRoutine(routineId: string) {
 }
 
 export function generateAiSuggestions() {
-  return request<AiSuggestion[]>('/ai/suggestions/generate', { method: 'POST', auth: true });
+  return request<AiSuggestion[]>('/ai/suggestions/generate', { method: 'POST', auth: true, timeoutMs: AI_TIMEOUT_MS });
 }
 
 export function getAiSuggestions() {
@@ -769,7 +787,7 @@ export function rejectAiSuggestion(suggestionId: string) {
 }
 
 export function analyzeRoutineGoal(routineId: string) {
-  return request<AiSuggestion[]>(`/ai/routines/${routineId}/analyze-goal`, { method: 'POST', auth: true });
+  return request<AiSuggestion[]>(`/ai/routines/${routineId}/analyze-goal`, { method: 'POST', auth: true, timeoutMs: AI_TIMEOUT_MS });
 }
 
 export function getCoachState() {
@@ -777,11 +795,11 @@ export function getCoachState() {
 }
 
 export function sendCoachMessage(payload: CoachMessageRequest) {
-  return request<CoachState>('/ai/coach/messages', { method: 'POST', auth: true, body: payload });
+  return request<CoachState>('/ai/coach/messages', { method: 'POST', auth: true, timeoutMs: AI_TIMEOUT_MS, body: payload });
 }
 
 export function generateCoachPlanDraft() {
-  return request<AiTrainingPlan>('/ai/coach/plan-drafts', { method: 'POST', auth: true });
+  return request<AiTrainingPlan>('/ai/coach/plan-drafts', { method: 'POST', auth: true, timeoutMs: AI_TIMEOUT_MS });
 }
 
 export function acceptCoachPlanDraft(planId: string) {
@@ -793,7 +811,7 @@ export function rejectCoachPlanDraft(planId: string) {
 }
 
 export function reviseCoachPlanDraft(planId: string, payload: CoachPlanDraftReviseRequest) {
-  return request<AiTrainingPlan>(`/ai/coach/plan-drafts/${planId}/revise`, { method: 'POST', auth: true, body: payload });
+  return request<AiTrainingPlan>(`/ai/coach/plan-drafts/${planId}/revise`, { method: 'POST', auth: true, timeoutMs: AI_TIMEOUT_MS, body: payload });
 }
 
 export function resetCoach() {
@@ -801,7 +819,7 @@ export function resetCoach() {
 }
 
 export function generateTrainingPlan(payload: AiTrainingPlanGenerateRequest) {
-  return request<AiTrainingPlan>('/ai/training-plans/generate', { method: 'POST', auth: true, body: payload });
+  return request<AiTrainingPlan>('/ai/training-plans/generate', { method: 'POST', auth: true, timeoutMs: AI_TIMEOUT_MS, body: payload });
 }
 
 export function getTrainingPlans() {
@@ -821,11 +839,11 @@ export function rejectTrainingPlan(planId: string) {
 }
 
 export function modifyTrainingPlan(planId: string, payload: AiTrainingPlanModifyRequest) {
-  return request<AiTrainingPlan>(`/ai/training-plans/${planId}/modify`, { method: 'POST', auth: true, body: payload });
+  return request<AiTrainingPlan>(`/ai/training-plans/${planId}/modify`, { method: 'POST', auth: true, timeoutMs: AI_TIMEOUT_MS, body: payload });
 }
 
 export function generateSessionSummary(sessionId: string) {
-  return request<AiSessionSummary>(`/ai/session-summaries/${sessionId}/generate`, { method: 'POST', auth: true });
+  return request<AiSessionSummary>(`/ai/session-summaries/${sessionId}/generate`, { method: 'POST', auth: true, timeoutMs: AI_TIMEOUT_MS });
 }
 
 export function getSessionSummary(sessionId: string) {

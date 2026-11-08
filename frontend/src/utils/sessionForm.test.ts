@@ -88,6 +88,11 @@ describe('sessionForm', () => {
     expect(result.error).toBe('Las reps de la serie 1 no son validas.');
   });
 
+  it('rejects unrealistic weight and reps', () => {
+    expect(buildWorkoutSets([row({ weight_value: '100000' })]).error).toBe('El peso de la serie 1 no es valido.');
+    expect(buildWorkoutSets([row({ reps: '5000' })]).error).toBe('Las reps de la serie 1 no son validas.');
+  });
+
   it('returns a readable error for invalid RPE', () => {
     const result = buildWorkoutSets([row({ rpe: '11' })]);
 

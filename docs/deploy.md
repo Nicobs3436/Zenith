@@ -135,6 +135,12 @@ En free tier, revisar limites de Neon. Antes de cambios importantes:
 - Ollama no se despliega gratis de forma estable en Render Free; para Coach V3 publico usar `APP_AI_PROVIDER=groq` y guardar `APP_AI_GROQ_API_KEY` como secreto.
 - Publicar apps nativas en tiendas no entra en presupuesto 0.
 
+## Rate Limits
+
+- Auth y endpoints de IA usan rate limit en memoria del proceso (una instancia).
+- IP real del cliente: el Dockerfile arranca uvicorn con `--proxy-headers` y `FORWARDED_ALLOW_IPS` limitado a redes privadas (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.1`). No usar `*`: con `*` uvicorn toma la IP mas a la izquierda de `X-Forwarded-For`, que el cliente puede falsear. Pendiente verificar en Render que el proxy llega desde red privada (si no, el limite vuelve a agruparse por IP del proxy; ajustar `FORWARDED_ALLOW_IPS`).
+- IA por usuario: `APP_AI_RATE_LIMIT_PER_MINUTE` (10) y `APP_AI_RATE_LIMIT_PER_DAY` (150) en endpoints que pueden llamar al proveedor; responden 429 al superarlo.
+
 ## Antes De Producto
 
 - Decidir politicas legales: privacidad, terminos, eliminacion/exportacion de cuenta y disclaimer medico.

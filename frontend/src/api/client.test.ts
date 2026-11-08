@@ -97,6 +97,35 @@ describe('api client auth refresh', () => {
     expect(mocks.router.replace).toHaveBeenCalledWith({ pathname: '/login', params: { notice: 'session-expired' } });
   });
 
+  it('keeps tokens when refresh fails because of the network', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ detail: 'Unauthorized' }, 401))
+      .mockRejectedValueOnce(new TypeError('Network request failed'));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = await loadClient();
+
+    await expect(client.getMe()).rejects.toThrow('Network request failed');
+
+    expect(mocks.tokenStorage.clearAuthTokens).not.toHaveBeenCalled();
+    expect(mocks.state.refreshToken).toBe('old-refresh-token');
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it('keeps tokens when refresh fails with a server error', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ detail: 'Unauthorized' }, 401))
+      .mockResolvedValueOnce(jsonResponse({ detail: 'Service unavailable' }, 503));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = await loadClient();
+
+    await expect(client.getMe()).rejects.toBeInstanceOf(client.ApiError);
+
+    expect(mocks.tokenStorage.clearAuthTokens).not.toHaveBeenCalled();
+    expect(mocks.state.refreshToken).toBe('old-refresh-token');
+  });
+
   it('revokes refresh token remotely and clears local tokens on logout', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(emptyResponse());
     vi.stubGlobal('fetch', fetchMock);
