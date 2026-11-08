@@ -346,7 +346,7 @@ def test_coach_does_not_store_limitations_without_ack(monkeypatch, client_with_d
         headers=auth_headers(token),
         json={
             "message": "Tengo dolor de rodilla y molestias de espalda.",
-            "personal_data_acknowledged": False,
+            "personal_data_acknowledged": True,
             "sensitive_data_acknowledged": False,
         },
     )
@@ -354,6 +354,28 @@ def test_coach_does_not_store_limitations_without_ack(monkeypatch, client_with_d
     assert response.status_code == 200
     assert response.json()["profile"]["physical_limitations"] is None
     assert response.json()["safety_flags"] == ["dolor requiere precaucion"]
+
+
+def test_coach_message_requires_personal_data_ack_for_external_provider(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, _session_factory = client_with_db
+    calls: list[object] = []
+    monkeypatch.setenv("APP_AI_PROVIDER", "groq")
+    monkeypatch.setenv("APP_AI_GROQ_API_KEY", "test-groq-key")
+    get_settings.cache_clear()
+    monkeypatch.setattr("app.application.ai_provider.urlopen", lambda *args, **kwargs: calls.append(args))
+    token = register_and_login(client, "coach-noack@example.com", "coach_noack")
+
+    response = client.post(
+        "/ai/coach/messages",
+        headers=auth_headers(token),
+        json={"message": "Tengo 29 anos y peso 80 kg.", "personal_data_acknowledged": False},
+    )
+
+    assert response.status_code == 422
+    assert "aviso de datos personales" in response.json()["detail"]
+    assert calls == []
+    state = client.get("/ai/coach", headers=auth_headers(token)).json()
+    assert state["profile"]["age"] is None
 
 
 def test_coach_message_returns_readable_error_when_groq_fails(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:

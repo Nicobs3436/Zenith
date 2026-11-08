@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Annotated, Any, Self
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     ai_groq_model: str = "llama-3.3-70b-versatile"
     ai_timeout_seconds: int = 20
     ai_external_data_enabled: bool = False
+    ai_rate_limit_per_minute: int = Field(default=10, ge=1)
+    ai_rate_limit_per_day: int = Field(default=150, ge=1)
     cors_origins: Annotated[list[str], NoDecode] = [
         "http://localhost:8081",
         "http://127.0.0.1:8081",

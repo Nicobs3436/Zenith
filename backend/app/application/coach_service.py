@@ -66,6 +66,7 @@ SEXES = {"male", "female"}
 LEVELS = {"beginner", "intermediate", "advanced"}
 PHASES = {"onboarding", "ready_for_plan", "plan_draft", "training_active"}
 PLAN_CREATED_BY = "coach"
+PERSONAL_DATA_ACK_REQUIRED_MESSAGE = "Acepta el aviso de datos personales antes de escribir al Coach."
 
 
 class CoachCannotGenerateError(Exception):
@@ -100,9 +101,13 @@ class CoachService:
         if data.sensitive_data_acknowledged:
             profile.sensitive_data_acknowledged = True
 
+        provider = build_ai_provider()
+        if getattr(provider, "external_data_sent", False) and not profile.personal_data_acknowledged:
+            # Nunca enviar texto del usuario a un proveedor externo sin aceptar el aviso de datos.
+            raise CoachCannotGenerateError(PERSONAL_DATA_ACK_REQUIRED_MESSAGE)
+
         local_changed = self._apply_profile_updates(profile, state, self._local_profile_updates(data.message, profile))
         missing_critical = self._missing_critical(profile)
-        provider = build_ai_provider()
         context = CoachInterviewProviderContext(
             profile=self._profile_snapshot(profile, state),
             interview_state=state,

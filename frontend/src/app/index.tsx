@@ -17,6 +17,8 @@ export default function IndexScreen() {
           router.replace('/dashboard');
         }
       })
+      // Sin red al arrancar: se conservan los tokens y el usuario puede reintentar al iniciar sesion.
+      .catch(() => undefined)
       .finally(() => setChecking(false));
   }, [router]);
 

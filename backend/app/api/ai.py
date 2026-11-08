@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.users import get_current_user
+from app.core.config import get_settings
+from app.core.rate_limit import RateLimitExceededError, check_rate_limit
 from app.application.ai_coach_service import (
     AiRoutineAnalysisNotFoundError,
     AiSuggestionCannotApplyError,
@@ -45,6 +47,28 @@ from app.infrastructure.db.session import get_db
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
+def get_ai_rate_limited_user(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """Limita por usuario las llamadas que pueden usar el proveedor de IA (cuota Groq compartida)."""
+    settings = get_settings()
+    try:
+        check_rate_limit(
+            key=f"ai-minute:{current_user.id}",
+            limit=settings.ai_rate_limit_per_minute,
+            window_seconds=60,
+        )
+        check_rate_limit(
+            key=f"ai-day:{current_user.id}",
+            limit=settings.ai_rate_limit_per_day,
+            window_seconds=86_400,
+        )
+    except RateLimitExceededError as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Has alcanzado el limite de peticiones a la IA. Espera un poco y reintenta.",
+        ) from error
+    return current_user
+
+
 @router.get("/coach", response_model=CoachStateRead)
 def get_coach_state(
     db: Annotated[Session, Depends(get_db)],
@@ -57,7 +81,7 @@ def get_coach_state(
 def add_coach_message(
     data: CoachMessageRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_ai_rate_limited_user)],
 ):
     try:
         return coach_service.add_message(db, current_user, data)
@@ -68,7 +92,7 @@ def add_coach_message(
 @router.post("/coach/plan-drafts", response_model=AiTrainingPlanRead, status_code=status.HTTP_201_CREATED)
 def generate_coach_plan_draft(
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_ai_rate_limited_user)],
 ):
     try:
         return coach_service.generate_plan_draft(db, current_user)
@@ -111,7 +135,7 @@ def revise_coach_plan_draft(
     plan_id: UUID,
     data: CoachPlanDraftReviseRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_ai_rate_limited_user)],
 ):
     try:
         return coach_service.revise_plan_draft(db, plan_id, current_user, data)
@@ -134,7 +158,7 @@ def reset_coach(
 @router.post("/suggestions/generate", response_model=list[AiSuggestionRead], status_code=status.HTTP_201_CREATED)
 def generate_suggestions(
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_ai_rate_limited_user)],
 ):
     return ai_coach_service.generate_suggestions(db, current_user)
 
@@ -151,7 +175,7 @@ def list_suggestions(
 def analyze_routine_goal(
     routine_id: UUID,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_ai_rate_limited_user)],
 ):
     try:
         return ai_coach_service.analyze_routine_goal(db, routine_id, current_user)
@@ -193,7 +217,7 @@ def reject_suggestion(
 def generate_training_plan(
     data: AiTrainingPlanGenerateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_ai_rate_limited_user)],
 ):
     try:
         return ai_training_plan_service.generate_plan(db, current_user, data)
@@ -256,7 +280,7 @@ def modify_training_plan(
     plan_id: UUID,
     data: AiTrainingPlanModifyRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_ai_rate_limited_user)],
 ):
     try:
         return ai_training_plan_service.modify_plan(db, plan_id, current_user, data)
@@ -272,7 +296,7 @@ def modify_training_plan(
 def generate_session_summary(
     session_id: UUID,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_ai_rate_limited_user)],
 ):
     try:
         return ai_session_summary_service.generate_summary(db, session_id, current_user)

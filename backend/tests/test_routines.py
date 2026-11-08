@@ -544,3 +544,117 @@ def test_delete_workout_session_returns_404_for_another_users_session(
     )
 
     assert response.status_code == 404
+
+
+def test_update_workout_session_keeps_link_to_deleted_routine(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    headers = {"Authorization": f"Bearer {token}"}
+    routine_id = client.post("/routines", headers=headers, json=routine_payload(str(exercise.id))).json()["id"]
+    session_payload = {
+        "routine_id": routine_id,
+        "started_at": datetime(2026, 7, 2, 10, 0, tzinfo=UTC).isoformat(),
+        "timezone": "Europe/Madrid",
+        "sets": [{"exercise_id": str(exercise.id), "set_number": 1, "reps": 5}],
+    }
+    session_id = client.post("/workout-sessions", headers=headers, json=session_payload).json()["id"]
+    client.delete(f"/routines/{routine_id}", headers=headers)
+
+    response = client.put(
+        f"/workout-sessions/{session_id}",
+        headers=headers,
+        json={**session_payload, "notes": "Editada tras borrar la rutina"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["routine_id"] == routine_id
+    assert response.json()["notes"] == "Editada tras borrar la rutina"
+
+
+def test_update_workout_session_rejects_switching_to_deleted_routine(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    headers = {"Authorization": f"Bearer {token}"}
+    deleted_routine_id = client.post("/routines", headers=headers, json=routine_payload(str(exercise.id))).json()["id"]
+    client.delete(f"/routines/{deleted_routine_id}", headers=headers)
+    session_payload = {
+        "routine_id": None,
+        "started_at": datetime(2026, 7, 2, 10, 0, tzinfo=UTC).isoformat(),
+        "timezone": "Europe/Madrid",
+        "sets": [{"exercise_id": str(exercise.id), "set_number": 1, "reps": 5}],
+    }
+    session_id = client.post("/workout-sessions", headers=headers, json=session_payload).json()["id"]
+
+    response = client.put(
+        f"/workout-sessions/{session_id}",
+        headers=headers,
+        json={**session_payload, "routine_id": deleted_routine_id},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "set_override",
+    [
+        {"weight_value": "1000000", "weight_unit": "kg"},
+        {"weight_value": "100.123", "weight_unit": "kg"},
+        {"reps": 100000},
+        {"rest_seconds": 99999},
+        {"rpe": "8.25"},
+    ],
+)
+def test_create_workout_session_rejects_unrealistic_values(
+    client_with_db: tuple[TestClient, SessionFactory], set_override: dict
+) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+
+    response = client.post(
+        "/workout-sessions",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "started_at": datetime(2026, 7, 2, 10, 0, tzinfo=UTC).isoformat(),
+            "timezone": "Europe/Madrid",
+            "sets": [{"exercise_id": str(exercise.id), "set_number": 1, "reps": 5, **set_override}],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_workout_session_rejects_too_many_sets(client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+
+    response = client.post(
+        "/workout-sessions",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "started_at": datetime(2026, 7, 2, 10, 0, tzinfo=UTC).isoformat(),
+            "timezone": "Europe/Madrid",
+            "sets": [{"exercise_id": str(exercise.id), "set_number": 1, "reps": 5}] * 301,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_routine_rejects_unrealistic_target_weight(client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    payload = routine_payload(str(exercise.id))
+    payload["exercises"][0].update({"target_weight_value": "999999", "target_weight_unit": "kg"})
+
+    response = client.post("/routines", headers={"Authorization": f"Bearer {token}"}, json=payload)
+
+    assert response.status_code == 422

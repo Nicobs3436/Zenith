@@ -21,6 +21,7 @@
 - Series estructuradas: reps, peso/unidad, RPE/RIR y descanso.
 - Para planes adaptativos legacy: objetivo, nivel, dias disponibles, duracion, equipamiento disponible, prioridades, catalogo estructurado de ejercicios accesibles y limitaciones fisicas si el usuario las confirma explicitamente.
 - Para Coach: objetivo, sexo biologico, edad, altura, peso, nivel, dias, duracion, equipamiento, prioridades, ejercicios evitados, resumen estructurado, ultimos mensajes necesarios y limitaciones fisicas solo si el usuario las confirma; la IA puede proponer ejercicios fuera del catalogo y el backend los crea como privados solo al aceptar.
+- El Coach no envia ningun mensaje a un proveedor externo (Groq) hasta que el usuario acepta el aviso de datos personales: el backend responde 422 sin llamar al proveedor y el frontend desactiva el envio. Pendiente: el texto libre del usuario puede mencionar lesiones antes de aceptar el aviso medico; `physical_limitations` se filtra en servidor, pero `known_facts`/mensajes recientes no se filtran semanticamente.
 - Para revisar planes del Coach: la instruccion libre del usuario, el resumen estructurado del plan original y los mismos campos de planificacion; no se usan notas, email, username ni tokens.
 - Para resumenes post-sesion: fecha, rutina asociada si existe, series estructuradas, reps, peso/unidad, RPE/RIR, descanso y agregados por ejercicio/unidad; no se usan notas.
 
