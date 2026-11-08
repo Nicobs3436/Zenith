@@ -8,13 +8,13 @@ import { zenith } from '@/constants/zenithTheme';
 export default function TermsScreen() {
   return (
     <ZenithScreen>
-      <ZenithHeader title="Terminos de uso" subtitle="Zenith beta" />
-      <Text style={styles.text}>Zenith es una herramienta de seguimiento y planificacion de entrenamiento en beta gratuita.</Text>
+      <ZenithHeader title="Términos de uso" subtitle="Zenith beta" />
+      <Text style={styles.text}>Zenith es una herramienta de seguimiento y planificación de entrenamiento en beta gratuita.</Text>
       <ZenithCard style={styles.card}>
         <Text style={styles.cardTitle}>Uso responsable</Text>
-        <Text style={styles.item}>- Revisa toda recomendacion antes de aceptarla.</Text>
-        <Text style={styles.item}>- No entrenes con dolor, mareo, perdida clara de tecnica o sintomas inusuales.</Text>
-        <Text style={styles.item}>- La app no sustituye consejo medico, fisioterapeutico ni de un entrenador cualificado.</Text>
+        <Text style={styles.item}>- Revisa toda recomendación antes de aceptarla.</Text>
+        <Text style={styles.item}>- No entrenes con dolor, mareo, pérdida clara de técnica o sintomas inusuales.</Text>
+        <Text style={styles.item}>- La app no sustituye consejo médico, fisioterapeutico ni de un entrenador cualificado.</Text>
       </ZenithCard>
       <ZenithCard style={styles.card}>
         <Text style={styles.cardTitle}>IA revisable</Text>
@@ -22,7 +22,7 @@ export default function TermsScreen() {
         <Text style={styles.item}>- Las sesiones historicas no se modifican por IA.</Text>
         <Text style={styles.item}>- Las preguntas al entrenador no crean cambios automaticos.</Text>
       </ZenithCard>
-      <ZenithNotice tone="warning">Limitaciones de beta: el servicio gratuito puede tener interrupciones, cold starts o limites del proveedor. No uses Zenith como unica copia de datos importantes.</ZenithNotice>
+      <ZenithNotice tone="warning">Limitaciones de beta: el servicio gratuito puede tener interrupciones, cold starts o limites del proveedor. No uses Zenith como única copia de datos importantes.</ZenithNotice>
       <Link href={'/privacy' as never} style={styles.link}>Ver privacidad</Link>
     </ZenithScreen>
   );

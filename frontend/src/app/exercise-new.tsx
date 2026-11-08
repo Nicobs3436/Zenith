@@ -82,21 +82,21 @@ export default function ExerciseNewScreen() {
     <ZenithScreen>
       <ZenithHeader title="Nuevo ejercicio" subtitle="Catalogo propio" />
       <Text style={styles.subtitle}>Crea ejercicios privados para usarlos en tus rutinas y sesiones.</Text>
-      {loadingRefs && <ZenithNotice>Cargando musculos y equipamiento...</ZenithNotice>}
+      {loadingRefs && <ZenithNotice>Cargando músculos y equipamiento...</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
 
       <ZenithCard style={styles.formCard}>
         <Field label="Nombre" onChangeText={setName} placeholder="Ej: Press banca con pausa" value={name} />
-        <Field label="Descripcion" multiline onChangeText={setDescription} placeholder="Que trabaja y cuando usarlo" value={description} />
+        <Field label="Descripción" multiline onChangeText={setDescription} placeholder="Que trabaja y cuando usarlo" value={description} />
         <Text style={styles.label}>Dificultad</Text>
         <View style={styles.chips}>
           {DIFFICULTIES.map((item) => (
             <Chip key={item.value} label={item.label} selected={difficulty === item.value} onPress={() => setDifficulty(item.value)} />
           ))}
         </View>
-        <ReferencePicker label="Musculos" items={muscleGroups} selectedIds={selectedMuscles} onChange={setSelectedMuscles} />
+        <ReferencePicker label="Músculos" items={muscleGroups} selectedIds={selectedMuscles} onChange={setSelectedMuscles} />
         <ReferencePicker label="Equipamiento" items={equipment} selectedIds={selectedEquipment} onChange={setSelectedEquipment} />
-        <Field label="Notas tecnicas" multiline onChangeText={setTechniqueNotes} placeholder="Claves de ejecucion, rango, seguridad" value={techniqueNotes} />
+        <Field label="Notas técnicas" multiline onChangeText={setTechniqueNotes} placeholder="Claves de ejecución, rango, seguridad" value={techniqueNotes} />
       </ZenithCard>
 
       <PrimaryButton disabled={saving || loadingRefs} onPress={submit} title={saving ? 'Guardando...' : 'Crear ejercicio'} />
@@ -121,7 +121,7 @@ function ReferencePicker({ label, items, onChange, selectedIds }: { label: strin
 
 function Chip({ label, onPress, selected }: { label: string; selected: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}>
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </Pressable>
   );
@@ -130,7 +130,7 @@ function Chip({ label, onPress, selected }: { label: string; selected: boolean; 
 const styles = StyleSheet.create({
   subtitle: { color: zenith.colors.muted, fontFamily: zenith.font.body, lineHeight: 21 },
   formCard: { gap: 14 },
-  label: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase' },
+  label: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' },
   referenceGroup: { gap: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: zenith.colors.secondary, borderColor: zenith.colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8 },

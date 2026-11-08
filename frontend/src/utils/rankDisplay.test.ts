@@ -12,7 +12,7 @@ describe('rankDisplay', () => {
   });
 
   it('formats max rank state', () => {
-    expect(formatNextRank({ next_rank: null, points_to_next_rank: null })).toBe('Rango maximo alcanzado.');
+    expect(formatNextRank({ next_rank: null, points_to_next_rank: null })).toBe('Rango máximo alcanzado.');
   });
 
   it('formats pending calculation date', () => {
@@ -29,7 +29,7 @@ describe('rankDisplay', () => {
     expect(rankExplanationLines).toEqual([
       'Suma volumen con peso, mejora de 1RM estimado y amplitud de ejercicios progresados.',
       'No hay puntos por sesiones registradas ni semanas activas.',
-      'kg y lb se mantienen separados; no hay conversion automatica.',
+      'kg y lb se mantienen separados; no hay conversion automática.',
     ]);
   });
 });

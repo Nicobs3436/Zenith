@@ -111,6 +111,6 @@ describe('routineForm', () => {
     const result = buildRoutineExercises([row({ target_rpe: '0' })]);
 
     expect(result.exercises).toBeNull();
-    expect(result.error).toBe('El RPE objetivo del ejercicio 1 no es valido.');
+    expect(result.error).toBe('El RPE objetivo del ejercicio 1 no es válido.');
   });
 });

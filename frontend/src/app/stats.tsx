@@ -33,9 +33,9 @@ import {
 type WeightFilter = 'all' | StatsWeightUnit;
 
 const PERIODS: { label: string; value: StatsPeriodFilter }[] = [
-  { label: '7 dias', value: '7d' },
-  { label: '30 dias', value: '30d' },
-  { label: '90 dias', value: '90d' },
+  { label: '7 días', value: '7d' },
+  { label: '30 días', value: '30d' },
+  { label: '90 días', value: '90d' },
   { label: 'Todo', value: 'all' },
 ];
 
@@ -46,7 +46,7 @@ const WEIGHT_FILTERS: { label: string; value: WeightFilter }[] = [
 ];
 
 const GROUP_PERIODS: { label: string; value: StatsGroupingPeriod }[] = [
-  { label: 'Dia', value: 'day' },
+  { label: 'Día', value: 'day' },
   { label: 'Semana', value: 'week' },
   { label: 'Mes', value: 'month' },
 ];
@@ -195,18 +195,18 @@ export default function StatsScreen() {
 
   return (
     <ZenithScreen bottomNav={<ZenithBottomNav />}>
-      <ZenithHeader title="Estadisticas" subtitle="Analisis" />
+      <ZenithHeader title="Estadísticas" subtitle="Análisis" />
       <Text style={styles.subtitle}>Volumen, carga y 1RM estimado por ejercicio, sin mezclar kg y lb.</Text>
 
       <FilterGroup label="Periodo" items={PERIODS} value={period} onChange={selectPeriod} />
       <FilterGroup label="Unidad" items={WEIGHT_FILTERS} value={weightFilter} onChange={selectWeightFilter} />
       <FilterGroup label="Detalle" items={GROUP_PERIODS} value={groupPeriod} onChange={selectGroupPeriod} />
 
-      {loading && <ZenithNotice>Cargando estadisticas...</ZenithNotice>}
+      {loading && <ZenithNotice>Cargando estadísticas...</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
       {!loading && !error && overview && <OverviewSection overview={overview} />}
       {!loading && !error && stats.length === 0 && (
-        <ZenithNotice>No hay datos para este periodo. Registra sesiones con ejercicios para ver estadisticas.</ZenithNotice>
+        <ZenithNotice>No hay datos para este periodo. Registra sesiones con ejercicios para ver estadísticas.</ZenithNotice>
       )}
 
       {!loading && !error && stats.map((item) => {
@@ -219,7 +219,7 @@ export default function StatsScreen() {
                 <Text style={styles.name}>{item.exercise_name}</Text>
                 <Text style={styles.meta}>{formatStatsUnit(item.weight_unit)} · {formatStatsDateRange(item)}</Text>
               </View>
-              <Pressable onPress={() => toggleItem(item)} style={styles.expandButton}>
+              <Pressable accessibilityRole="button" onPress={() => toggleItem(item)} style={styles.expandButton}>
                 <Text style={styles.expand}>{expanded ? 'Cerrar' : 'Detalle'}</Text>
               </Pressable>
             </View>
@@ -277,7 +277,7 @@ function OverviewSection({ overview }: { overview: StatsOverview }) {
 
       <ZenithCard style={styles.overviewCard}>
         <View style={styles.overviewHeader}>
-          <Text style={styles.overviewTitle}>Series por musculo</Text>
+          <Text style={styles.overviewTitle}>Series por músculo</Text>
           <Activity color={zenith.colors.primary} size={14} />
         </View>
         {overview.muscle_groups.length > 0 ? <MuscleBars items={overview.muscle_groups.slice(0, 6)} /> : <Text style={styles.detailText}>No hay grupos musculares registrados.</Text>}
@@ -285,7 +285,7 @@ function OverviewSection({ overview }: { overview: StatsOverview }) {
 
       <ZenithCard style={styles.overviewCard}>
         <Text style={styles.overviewTitle}>Levantamientos principales</Text>
-        {overview.top_exercises.length > 0 ? overview.top_exercises.map((item) => <TopExercise key={`${item.exercise_id}-${item.weight_unit ?? 'bodyweight'}`} item={item} />) : <Text style={styles.detailText}>No hay levantamientos con carga todavia.</Text>}
+        {overview.top_exercises.length > 0 ? overview.top_exercises.map((item) => <TopExercise key={`${item.exercise_id}-${item.weight_unit ?? 'bodyweight'}`} item={item} />) : <Text style={styles.detailText}>No hay levantamientos con carga todavía.</Text>}
       </ZenithCard>
     </View>
   );
@@ -347,7 +347,7 @@ function FilterGroup<T extends string>({
       <Text style={styles.filterLabel}>{label}</Text>
       <View style={styles.filters}>
         {items.map((item) => (
-          <Pressable
+          <Pressable accessibilityRole="button"
             key={item.value}
             onPress={() => onChange(item.value)}
             style={[styles.filterButton, value === item.value && styles.filterButtonActive]}
@@ -376,14 +376,14 @@ function StatsDetail({ metric, onMetricChange, points, unit }: { metric: StatsCh
   const visiblePoints = points.slice(-6).reverse();
   return (
     <View style={styles.detailContent}>
-      <FilterGroup label="Metrica" items={CHART_METRICS} value={metric} onChange={onMetricChange} />
+      <FilterGroup label="Métrica" items={CHART_METRICS} value={metric} onChange={onMetricChange} />
       <Text style={styles.chartTitle}>Progresion · {chart.label}</Text>
       {hasMetricData ? (
         <>
           <LineProgressChart points={progressionPoints} />
           <ProgressSummary points={progressionPoints} unit={unit} />
         </>
-      ) : <Text style={styles.detailText}>No hay datos de esta metrica para este ejercicio.</Text>}
+      ) : <Text style={styles.detailText}>No hay datos de esta métrica para este ejercicio.</Text>}
       <View style={styles.pointsList}>
         {visiblePoints.map((point) => (
           <View key={`${point.period_start}-${point.weight_unit ?? 'bodyweight'}`} style={styles.pointRow}>
@@ -430,7 +430,7 @@ function LineProgressChart({ points }: { points: { label: string; value: number 
         {first && <SvgText fill={zenith.colors.muted} fontSize="10" textAnchor="start" x={paddingX} y={height - 8}>{first.label}</SvgText>}
         {last && <SvgText fill={zenith.colors.muted} fontSize="10" textAnchor="end" x={width - paddingX} y={height - 8}>{last.label}</SvgText>}
       </Svg>
-      {points.length === 1 && <Text style={styles.progressHint}>Necesitas mas sesiones para ver progresion.</Text>}
+      {points.length === 1 && <Text style={styles.progressHint}>Necesitas más sesiones para ver progresión.</Text>}
     </View>
   );
 }
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   kpiCard: { flexGrow: 1, gap: 5, minWidth: '47%', padding: 13 },
   kpiHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  kpiLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 9, textTransform: 'uppercase' },
+  kpiLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, textTransform: 'uppercase' },
   kpiValue: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 30, lineHeight: 32, textTransform: 'uppercase' },
   kpiDetail: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 11 },
   overviewCard: { gap: 12 },
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
   topExerciseMeta: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 11 },
   topExerciseValue: { color: zenith.colors.primary, fontFamily: zenith.font.display, fontSize: 20 },
   filterSection: { gap: 8 },
-  filterLabel: { color: zenith.colors.foreground, fontFamily: zenith.font.mono, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
+  filterLabel: { color: zenith.colors.foreground, fontFamily: zenith.font.mono, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase' },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   filterButton: { backgroundColor: zenith.colors.secondary, borderColor: zenith.colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   filterButtonActive: { backgroundColor: zenith.colors.primary, borderColor: zenith.colors.primary },
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   metric: { backgroundColor: zenith.colors.background, borderColor: zenith.colors.border, borderRadius: 14, borderWidth: 1, minWidth: '30%', padding: 10 },
   metricValue: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 20, lineHeight: 22 },
-  metricLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, marginTop: 4 },
+  metricLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, marginTop: 4 },
   detail: { borderTopColor: zenith.colors.border, borderTopWidth: 1, paddingTop: 14 },
   detailContent: { gap: 12 },
   detailText: { color: zenith.colors.foreground, fontFamily: zenith.font.body },
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
   chart: { alignItems: 'flex-end', backgroundColor: zenith.colors.background, borderRadius: 16, flexDirection: 'row', gap: 6, minHeight: 130, padding: 12 },
   barSlot: { alignItems: 'center', flex: 1, gap: 6, justifyContent: 'flex-end' },
   bar: { backgroundColor: zenith.colors.primary, borderRadius: 999, width: '100%' },
-  barLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 9 },
+  barLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11 },
   pointsList: { gap: 8 },
   pointRow: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   pointDate: { color: zenith.colors.muted, fontFamily: zenith.font.bodyBold },

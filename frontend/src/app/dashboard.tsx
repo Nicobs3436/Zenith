@@ -3,13 +3,13 @@ import { Activity, ChevronRight, Flame, Play, Sparkles, TrendingUp, Trophy, Zap 
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AuthExpiredError, ExerciseStats, getExerciseStats, getMe, getRank, getRoutines, getWorkoutSessions, logout, RankProgress, Routine, User, WorkoutSession } from '@/api/client';
+import { AuthExpiredError, Exercise, ExerciseStats, getExercises, getExerciseStats, getMe, getRank, getRoutines, getWorkoutSessions, logout, RankProgress, Routine, User, WorkoutSession } from '@/api/client';
 import { ZenithBottomNav, ZenithButton, ZenithCard, ZenithNotice, ZenithPill, ZenithStatCard, zenithText } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { routineAccents, zenith } from '@/constants/zenithTheme';
 import { formatRankScore } from '@/utils/rankDisplay';
 import { formatStatsValue } from '@/utils/statsDisplay';
-import { plannedRoutineExercises } from '@/utils/workoutDisplay';
+import { exerciseName, plannedRoutineExercises } from '@/utils/workoutDisplay';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -18,13 +18,14 @@ export default function DashboardScreen() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [stats, setStats] = useState<ExerciseStats[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    Promise.all([getMe(), getRank(), getRoutines(), getWorkoutSessions(), getExerciseStats('30d')])
-      .then(([nextUser, nextRank, nextRoutines, nextSessions, nextStats]) => {
+    Promise.all([getMe(), getRank(), getRoutines(), getWorkoutSessions(), getExerciseStats('30d'), getExercises()])
+      .then(([nextUser, nextRank, nextRoutines, nextSessions, nextStats, nextExercises]) => {
         if (!active) {
           return;
         }
@@ -33,6 +34,7 @@ export default function DashboardScreen() {
         setRoutines(nextRoutines);
         setSessions(nextSessions);
         setStats(nextStats);
+        setExercises(nextExercises);
       })
       .catch((caught) => {
         if (!active) {
@@ -94,7 +96,7 @@ export default function DashboardScreen() {
           </View>
         </ZenithCard>
         <Link href="/rank" asChild>
-          <Pressable style={styles.rankCard}>
+          <Pressable accessibilityRole="button" style={styles.rankCard}>
             <Trophy color={zenith.colors.primary} size={20} />
             <View style={styles.rankTextBlock}>
               <Text style={styles.rankName}>{rank?.rank.name ?? 'Sin rango'}</Text>
@@ -107,36 +109,36 @@ export default function DashboardScreen() {
 
       <View style={styles.statGrid}>
         <ZenithStatCard icon={<Activity color={zenith.colors.muted} size={13} />} label="Rutinas" value={String(routines.length)} unit="activas" />
-        <ZenithStatCard icon={<TrendingUp color={zenith.colors.muted} size={13} />} label="Volumen" value={formatCompactVolume(totalVolume)} unit="30 dias" />
-        <ZenithStatCard icon={<Zap color={zenith.colors.muted} size={13} />} label="Series" value={String(totalSets)} unit="30 dias" />
+        <ZenithStatCard icon={<TrendingUp color={zenith.colors.muted} size={13} />} label="Volumen" value={formatCompactVolume(totalVolume)} unit="30 días" />
+        <ZenithStatCard icon={<Zap color={zenith.colors.muted} size={13} />} label="Series" value={String(totalSets)} unit="30 días" />
       </View>
 
       <ZenithCard style={styles.sessionCard}>
         <View style={styles.sessionHeader}>
           <View>
-            <Text style={styles.sessionKicker}>Proxima rutina</Text>
+            <Text style={styles.sessionKicker}>Próxima rutina</Text>
             <Text style={styles.sessionTitle}>{nextRoutine?.name ?? 'Crea tu primer plan'}</Text>
           </View>
-          <ZenithPill active>{nextRoutine ? `${nextRoutineExercises.length} ejercicios` : 'Nuevo'}</ZenithPill>
+          <ZenithPill active>{nextRoutine ? `${nextRoutineExercises.length} ${nextRoutineExercises.length === 1 ? 'ejercicio' : 'ejercicios'}` : 'Nuevo'}</ZenithPill>
         </View>
         {nextRoutine ? (
           <View style={styles.exerciseList}>
             {nextRoutineExercises.slice(0, 4).map((exercise, index) => (
               <View key={exercise.id ?? `${exercise.exercise_id}-${exercise.position}`} style={styles.exerciseLine}>
                 <View style={[styles.exerciseDot, { backgroundColor: routineAccents[index % routineAccents.length] }]} />
-                <Text style={styles.exerciseName}>Ejercicio {exercise.position}</Text>
+                <Text style={styles.exerciseName}>{exerciseName(exercise.exercise_id, exercises)}</Text>
                 <Text style={styles.exerciseSpec}>{exercise.target_sets ?? '-'}x{exercise.target_reps_min ?? '-'}</Text>
               </View>
             ))}
           </View>
         ) : (
-          <Text style={styles.mutedText}>Todavia no tienes rutinas. Crea una para empezar a registrar entrenamientos.</Text>
+          <Text style={styles.mutedText}>Todavía no tienes rutinas. Crea una para empezar a registrar entrenamientos.</Text>
         )}
         <View style={styles.sessionActions}>
           <Link href={nextRoutine ? { pathname: '/session-active', params: { routineId: nextRoutine.id } } : '/routine-new'} asChild>
-            <Pressable style={styles.primaryAction}>
+            <Pressable accessibilityRole="button" style={styles.primaryAction}>
               <Play color={zenith.colors.primaryForeground} fill={zenith.colors.primaryForeground} size={15} />
-              <Text style={styles.primaryActionText}>{nextRoutine ? 'Iniciar sesion' : 'Crear rutina'}</Text>
+              <Text style={styles.primaryActionText}>{nextRoutine ? 'Iniciar sesión' : 'Crear rutina'}</Text>
             </Pressable>
           </Link>
         </View>
@@ -151,14 +153,11 @@ export default function DashboardScreen() {
       </ZenithCard>
 
       <View style={styles.quickGrid}>
-        <Link href="/routines" style={styles.quickLink}>Rutinas</Link>
-        <Link href="/exercises" style={styles.quickLink}>Ejercicios</Link>
-        <Link href="/sessions" style={styles.quickLink}>Sesiones</Link>
-        <Link href="/coach" style={styles.quickLink}>Coach</Link>
-        <Link href={'/account' as never} style={styles.quickLink}>Cuenta</Link>
+        <Link accessibilityRole="link" href="/sessions" style={styles.quickLink}>Historial de sesiones</Link>
+        <Link accessibilityRole="link" href={'/account' as never} style={styles.quickLink}>Cuenta y datos</Link>
       </View>
 
-      <ZenithButton onPress={submitLogout} title="Cerrar sesion" variant="danger" />
+      <ZenithButton onPress={submitLogout} title="Cerrar sesión" variant="danger" />
     </ZenithScreen>
   );
 }
@@ -173,7 +172,7 @@ function formatCompactVolume(value: number) {
 const styles = StyleSheet.create({
   heroHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   heroTitleBlock: { flex: 1, gap: 2 },
-  date: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, letterSpacing: 2, textTransform: 'uppercase' },
+  date: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase' },
   title: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 34, lineHeight: 38, textTransform: 'uppercase' },
   titleAccent: { color: zenith.colors.primary },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
@@ -183,15 +182,15 @@ const styles = StyleSheet.create({
   compactCard: { flex: 1, padding: 14 },
   inlineCardContent: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   bigNumber: { color: zenith.colors.primary, fontFamily: zenith.font.display, fontSize: 24, lineHeight: 25 },
-  smallLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, textTransform: 'uppercase' },
+  smallLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, textTransform: 'uppercase' },
   rankCard: { alignItems: 'center', backgroundColor: zenith.colors.card, borderColor: zenith.colors.border, borderRadius: zenith.radius.xl, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 10, padding: 14 },
   rankTextBlock: { flex: 1 },
   rankName: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, fontSize: 14 },
-  rankScore: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10 },
+  rankScore: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11 },
   statGrid: { flexDirection: 'row', gap: 8 },
   sessionCard: { gap: 14, padding: 0, overflow: 'hidden' },
   sessionHeader: { alignItems: 'center', backgroundColor: 'rgba(200,241,53,0.04)', borderBottomColor: zenith.colors.primaryBorder, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', padding: 16 },
-  sessionKicker: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
+  sessionKicker: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase' },
   sessionTitle: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 24, textTransform: 'uppercase' },
   exerciseList: { gap: 10, paddingHorizontal: 16 },
   exerciseLine: { alignItems: 'center', flexDirection: 'row', gap: 10 },

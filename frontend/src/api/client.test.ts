@@ -167,7 +167,7 @@ describe('api client auth refresh', () => {
       status: 'pending',
       input_summary: {},
       recommendation: 'Sube peso',
-      explanation: 'Progresion estable',
+      explanation: 'Progresión estable',
       risk_notes: null,
       confidence: 'high',
       apply_payload: {},
@@ -247,7 +247,7 @@ describe('api client auth refresh', () => {
     await expect(client.getTrainingPlan('plan-1')).resolves.toEqual(plan);
     await expect(client.acceptTrainingPlan('plan-1')).resolves.toEqual({ ...plan, status: 'accepted' });
     await expect(client.rejectTrainingPlan('plan-1')).resolves.toEqual({ ...plan, status: 'rejected' });
-    await expect(client.modifyTrainingPlan('plan-1', { instruction: 'Hazlo a 4 dias', sensitive_data_acknowledged: false })).resolves.toEqual({
+    await expect(client.modifyTrainingPlan('plan-1', { instruction: 'Hazlo a 4 días', sensitive_data_acknowledged: false })).resolves.toEqual({
       ...plan,
       id: 'plan-2',
       input_summary: { modified_from_plan_id: 'plan-1' },
@@ -261,7 +261,7 @@ describe('api client auth refresh', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       6,
       'http://localhost:8000/ai/training-plans/plan-1/modify',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ instruction: 'Hazlo a 4 dias', sensitive_data_acknowledged: false }) }),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ instruction: 'Hazlo a 4 días', sensitive_data_acknowledged: false }) }),
     );
   });
 
@@ -446,10 +446,10 @@ describe('account endpoints', () => {
   });
 
   it('keeps the session when the password is wrong', async () => {
-    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({ detail: 'Contrasena incorrecta.' }, 403)));
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({ detail: 'Contraseña incorrecta.' }, 403)));
     const client = await loadClient();
 
-    await expect(client.deleteAccount('wrong')).rejects.toThrow('Contrasena incorrecta.');
+    await expect(client.deleteAccount('wrong')).rejects.toThrow('Contraseña incorrecta.');
     expect(mocks.state.refreshToken).toBe('refresh-token');
   });
 });

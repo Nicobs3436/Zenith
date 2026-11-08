@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Routine } from '@/api/client';
-import { buildWorkoutSets, duplicateSetRow, newSetRow, rowsFromRoutine, SetRow, toIsoDateTime } from './sessionForm';
+import { buildWorkoutSets, duplicateSetRow, newSetRow, rowsFromRoutine, SetRow, formatLocalDateTime, toIsoDateTime } from './sessionForm';
 
 function row(overrides: Partial<SetRow> = {}): SetRow {
   return {
@@ -85,19 +85,19 @@ describe('sessionForm', () => {
     const result = buildWorkoutSets([row({ reps: '8.5' })]);
 
     expect(result.sets).toBeNull();
-    expect(result.error).toBe('Las reps de la serie 1 no son validas.');
+    expect(result.error).toBe('Las reps de la serie 1 no son válidas.');
   });
 
   it('rejects unrealistic weight and reps', () => {
-    expect(buildWorkoutSets([row({ weight_value: '100000' })]).error).toBe('El peso de la serie 1 no es valido.');
-    expect(buildWorkoutSets([row({ reps: '5000' })]).error).toBe('Las reps de la serie 1 no son validas.');
+    expect(buildWorkoutSets([row({ weight_value: '100000' })]).error).toBe('El peso de la serie 1 no es válido.');
+    expect(buildWorkoutSets([row({ reps: '5000' })]).error).toBe('Las reps de la serie 1 no son válidas.');
   });
 
   it('returns a readable error for invalid RPE', () => {
     const result = buildWorkoutSets([row({ rpe: '11' })]);
 
     expect(result.sets).toBeNull();
-    expect(result.error).toBe('El RPE de la serie 1 no es valido.');
+    expect(result.error).toBe('El RPE de la serie 1 no es válido.');
   });
 });
 
@@ -107,6 +107,14 @@ describe('decimal and date input normalization', () => {
 
     expect(result.error).toBeNull();
     expect(result.sets?.[0]).toMatchObject({ weight_value: '62.5', rpe: '8.5' });
+  });
+
+  it('formats dates in local time and round-trips them', () => {
+    const local = formatLocalDateTime(new Date(2026, 6, 2, 9, 5));
+
+    expect(local).toBe('2026-07-02 09:05');
+    expect(toIsoDateTime(local)).toBe(new Date(2026, 6, 2, 9, 5).toISOString());
+    expect(formatLocalDateTime('no es fecha')).toBe('');
   });
 
   it('converts local date input to ISO with offset and rejects invalid dates', () => {

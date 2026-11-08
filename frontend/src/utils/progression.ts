@@ -33,7 +33,7 @@ export function progressionHintForExercise(planned: RoutineExercise, sessions: W
   if (lastSets.length === 0) {
     return {
       lastSummary: 'Sin sesiones previas.',
-      recommendation: 'Empieza con una carga conservadora y prioriza tecnica.',
+      recommendation: 'Empieza con una carga conservadora y prioriza técnica.',
     };
   }
 
@@ -46,11 +46,11 @@ export function progressionHintForExercise(planned: RoutineExercise, sessions: W
   const minReps = Math.min(...reps);
   const maxReps = Math.max(...reps);
   const lastSummary = heaviestSet
-    ? `Ultima vez: ${lastSets.length} series, ${minReps}-${maxReps} reps, hasta ${heaviestSet.weight_value} ${heaviestSet.weight_unit}.`
-    : `Ultima vez: ${lastSets.length} series, ${minReps}-${maxReps} reps sin peso.`;
+    ? `Última vez: ${lastSets.length} series, ${minReps}-${maxReps} reps, hasta ${heaviestSet.weight_value} ${heaviestSet.weight_unit}.`
+    : `Última vez: ${lastSets.length} series, ${minReps}-${maxReps} reps sin peso.`;
 
   if (!heaviestSet || !heaviestSet.weight_value || !heaviestSet.weight_unit) {
-    return { lastSummary, recommendation: 'Mantén reps controladas o anade carga solo si la tecnica fue solida.' };
+    return { lastSummary, recommendation: 'Mantén reps controladas o añade carga solo si la técnica fue solida.' };
   }
 
   if (planned.target_reps_max !== null && minReps >= planned.target_reps_max) {
@@ -59,11 +59,11 @@ export function progressionHintForExercise(planned: RoutineExercise, sessions: W
     }
     const increment = heaviestSet.weight_unit === 'kg' ? 2.5 : 5;
     const nextWeight = Number(heaviestSet.weight_value) + increment;
-    return { lastSummary, recommendation: `Si calentamiento y tecnica van bien, prueba ${nextWeight} ${heaviestSet.weight_unit}.` };
+    return { lastSummary, recommendation: `Si calentamiento y técnica van bien, prueba ${nextWeight} ${heaviestSet.weight_unit}.` };
   }
 
   if (planned.target_reps_min !== null && minReps < planned.target_reps_min) {
-    return { lastSummary, recommendation: 'No alcanzaste el minimo objetivo: mantén o baja un poco el peso.' };
+    return { lastSummary, recommendation: 'No alcanzaste el mínimo objetivo: mantén o baja un poco el peso.' };
   }
 
   return { lastSummary, recommendation: 'Mantén el peso e intenta acercarte al rango alto de reps.' };

@@ -58,7 +58,7 @@ function parseOptionalNumber(value: string, label: string, min: number, max?: nu
   }
   const parsed = Number(trimmed);
   if (Number.isNaN(parsed) || parsed < min || (max !== undefined && parsed > max)) {
-    return { value: null, error: `${label} no es valido.` };
+    return { value: null, error: `${label} no es válido.` };
   }
   return { value: parsed, error: null };
 }
@@ -70,7 +70,7 @@ function parseOptionalInteger(value: string, label: string, min: number) {
   }
   const parsed = Number(trimmed);
   if (!Number.isInteger(parsed) || parsed < min) {
-    return { value: null, error: `${label} no es valido.` };
+    return { value: null, error: `${label} no es válido.` };
   }
   return { value: parsed, error: null };
 }
@@ -83,7 +83,7 @@ export function buildRoutineExercises(rows: RoutineExerciseRow[]): BuildRoutineE
   const exercises: RoutineExercise[] = [];
   for (const [index, row] of rows.entries()) {
     if (!row.exercise_id) {
-      return { exercises: null, error: `El ejercicio ${index + 1} necesita una seleccion.` };
+      return { exercises: null, error: `El ejercicio ${index + 1} necesita una selección.` };
     }
 
     const targetSets = parseOptionalInteger(row.target_sets, `Las series del ejercicio ${index + 1}`, 1);

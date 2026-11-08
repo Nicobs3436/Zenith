@@ -5,7 +5,8 @@ export const zenith = {
     foreground: '#f0f0f5',
     card: '#111118',
     secondary: '#1c1c26',
-    muted: '#7a7a96',
+    // Ajustado para contraste WCAG AA (>= 4.5:1) tambien sobre `secondary`.
+    muted: '#8a8aa6',
     border: 'rgba(255,255,255,0.07)',
     primary: '#c8f135',
     primarySoft: 'rgba(200,241,53,0.12)',

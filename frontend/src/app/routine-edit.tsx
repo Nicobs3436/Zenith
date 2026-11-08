@@ -6,7 +6,7 @@ import { deleteRoutine, Exercise, getExercises, getRoutine, updateRoutine } from
 import { ExerciseSelector } from '@/components/ExerciseSelector';
 import { Field } from '@/components/Field';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { SegmentedField } from '@/components/SegmentedField';
+import { RoutineExerciseFields } from '@/components/RoutineExerciseFields';
 import { ZenithCard, ZenithHeader, ZenithNotice } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
@@ -124,9 +124,9 @@ export default function EditRoutineScreen() {
     <ZenithScreen>
       <ZenithHeader title="Editar rutina" subtitle="Plan activo" />
       {loading && <ZenithNotice>Cargando rutina...</ZenithNotice>}
-      <Field label="Nombre" onChangeText={setName} value={name} />
+      <Field label="Nombre" onChangeText={setName} placeholder="Ej: Torso fuerza, Pierna A..." value={name} />
       <Field label="Objetivo opcional" onChangeText={setGoal} value={goal} />
-      <Field label="Descripcion opcional" multiline onChangeText={setDescription} value={description} />
+      <Field label="Descripción opcional" multiline onChangeText={setDescription} value={description} />
       <Text style={styles.section}>Ejercicios planificados</Text>
       {rows.map((row, index) => (
         <ZenithCard key={row.key} style={styles.card}>
@@ -137,31 +137,16 @@ export default function EditRoutineScreen() {
             onSelect={(exercise_id) => updateRow(row.key, { exercise_id })}
             selectedExerciseId={row.exercise_id}
           />
-          <View style={styles.grid}>
-            <Field keyboardType="numeric" label="Series" onChangeText={(target_sets) => updateRow(row.key, { target_sets })} value={row.target_sets} />
-            <Field keyboardType="numeric" label="Reps min" onChangeText={(target_reps_min) => updateRow(row.key, { target_reps_min })} value={row.target_reps_min} />
-            <Field keyboardType="numeric" label="Reps max" onChangeText={(target_reps_max) => updateRow(row.key, { target_reps_max })} value={row.target_reps_max} />
-            <Field keyboardType="decimal-pad" label="Peso objetivo" onChangeText={(target_weight_value) => updateRow(row.key, { target_weight_value })} value={row.target_weight_value} />
-            <SegmentedField
-              label="Unidad objetivo"
-              onValueChange={(target_weight_unit) => updateRow(row.key, { target_weight_unit: target_weight_unit as 'kg' | 'lb' })}
-              options={[{ label: 'kg', value: 'kg' }, { label: 'lb', value: 'lb' }]}
-              selectedValue={row.target_weight_unit}
-            />
-            <Field keyboardType="decimal-pad" label="RPE objetivo" onChangeText={(target_rpe) => updateRow(row.key, { target_rpe })} value={row.target_rpe} />
-            <Field keyboardType="numeric" label="RIR objetivo" onChangeText={(target_rir) => updateRow(row.key, { target_rir })} value={row.target_rir} />
-            <Field keyboardType="numeric" label="Descanso seg" onChangeText={(rest_seconds) => updateRow(row.key, { rest_seconds })} value={row.rest_seconds} />
-          </View>
-          <Field label="Notas ejercicio" multiline onChangeText={(notes) => updateRow(row.key, { notes })} value={row.notes} />
+          <RoutineExerciseFields onChange={(patch) => updateRow(row.key, patch)} row={row} />
           {rows.length > 1 && (
-            <Pressable onPress={() => removeRow(row.key)} style={styles.removeButton}>
+            <Pressable accessibilityRole="button" onPress={() => removeRow(row.key)} style={styles.removeButton}>
               <Text style={styles.removeText}>Quitar ejercicio</Text>
             </Pressable>
           )}
         </ZenithCard>
       ))}
-      <Pressable onPress={addRow} style={styles.secondaryButton}>
-        <Text style={styles.secondaryText}>Anadir ejercicio</Text>
+      <Pressable accessibilityRole="button" onPress={addRow} style={styles.secondaryButton}>
+        <Text style={styles.secondaryText}>Añadir ejercicio</Text>
       </Pressable>
       {!id && <ZenithNotice tone="danger">Rutina no encontrada.</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
@@ -170,7 +155,7 @@ export default function EditRoutineScreen() {
         <Text style={styles.dangerTitle}>Eliminar rutina</Text>
         <Text style={styles.dangerText}>La rutina se ocultara, pero las sesiones historicas asociadas se conservaran.</Text>
         {deleteConfirm && <Text style={styles.dangerText}>Pulsa otra vez para confirmar.</Text>}
-        <Pressable disabled={deleting} onPress={submitDelete} style={[styles.deleteButton, deleting && styles.disabled]}>
+        <Pressable accessibilityRole="button" disabled={deleting} onPress={submitDelete} style={[styles.deleteButton, deleting && styles.disabled]}>
           <Text style={styles.deleteText}>{deleting ? 'Eliminando...' : 'Eliminar rutina'}</Text>
         </Pressable>
       </View>
@@ -182,7 +167,6 @@ const styles = StyleSheet.create({
   section: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 24, textTransform: 'uppercase' },
   card: { gap: 12 },
   cardTitle: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 23, textTransform: 'uppercase' },
-  grid: { gap: 12 },
   secondaryButton: { alignItems: 'center', borderColor: zenith.colors.primaryBorder, borderRadius: 16, borderWidth: 1, padding: 14 },
   secondaryText: { color: zenith.colors.primary, fontFamily: zenith.font.bodyBold },
   removeButton: { alignItems: 'center', borderColor: 'rgba(232,64,64,0.35)', borderRadius: 12, borderWidth: 1, padding: 10 },

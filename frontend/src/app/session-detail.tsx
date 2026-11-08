@@ -90,7 +90,7 @@ export default function SessionDetailScreen() {
 
   async function submitGenerateSummary() {
     if (!id) {
-      setError('Sesion no encontrada.');
+      setError('Sesión no encontrada.');
       return;
     }
     setSummarySaving(true);
@@ -106,7 +106,7 @@ export default function SessionDetailScreen() {
 
   async function submitDelete() {
     if (!id) {
-      setError('Sesion no encontrada.');
+      setError('Sesión no encontrada.');
       return;
     }
     if (!deleteConfirm) {
@@ -119,7 +119,7 @@ export default function SessionDetailScreen() {
       await deleteWorkoutSession(id);
       router.replace('/sessions?notice=deleted');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'No se pudo eliminar la sesion.');
+      setError(caught instanceof Error ? caught.message : 'No se pudo eliminar la sesión.');
     } finally {
       setDeleting(false);
     }
@@ -127,9 +127,9 @@ export default function SessionDetailScreen() {
 
   return (
     <ZenithScreen>
-      <ZenithHeader title="Detalle sesion" subtitle="Historial" />
-      {loading && <ZenithNotice>Cargando sesion...</ZenithNotice>}
-      {!id && <ZenithNotice tone="danger">Sesion no encontrada.</ZenithNotice>}
+      <ZenithHeader title="Detalle sesión" subtitle="Historial" />
+      {loading && <ZenithNotice>Cargando sesión...</ZenithNotice>}
+      {!id && <ZenithNotice tone="danger">Sesión no encontrada.</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
       {session && (
         <>
@@ -141,10 +141,10 @@ export default function SessionDetailScreen() {
             <Text style={styles.meta}>Zona horaria: {session.timezone}</Text>
             <Text style={styles.meta}>Volumen: {formatVolumeByUnit(session.sets)}</Text>
             {session.notes && <Text style={styles.notes}>{session.notes}</Text>}
-            <Link href={{ pathname: '/session-edit', params: { sessionId: session.id } }} style={styles.link}>Editar sesion</Link>
+            <Link href={{ pathname: '/session-edit', params: { sessionId: session.id } }} style={styles.link}>Editar sesión</Link>
             <View style={styles.summaryBox}>
               <Text style={styles.summaryTitle}>Resumen IA post-sesion</Text>
-              <Text style={styles.summaryHelp}>Genera un analisis revisable. No modifica rutinas ni sesiones.</Text>
+              <Text style={styles.summaryHelp}>Genera un análisis revisable. No modifica rutinas ni sesiones.</Text>
               {summaryLoading && <Text style={styles.meta}>Buscando resumen existente...</Text>}
               <ZenithButton disabled={summarySaving} icon={<Bot color={zenith.colors.primaryForeground} size={14} />} onPress={submitGenerateSummary} title={summarySaving ? 'Generando...' : summary ? 'Regenerar resumen IA' : 'Generar resumen IA'} />
               {summary && (
@@ -154,7 +154,7 @@ export default function SessionDetailScreen() {
                   <SummaryList items={summary.drops} title="Caidas" />
                   <SummaryList items={summary.warnings} title="Warnings" variant="warning" />
                   <View style={styles.summaryGroup}>
-                    <Text style={styles.summaryGroupTitle}>Proxima recomendacion</Text>
+                    <Text style={styles.summaryGroupTitle}>Próxima recomendación</Text>
                     <Text style={styles.summaryItem}>{summary.next_recommendation}</Text>
                   </View>
                   <Text style={styles.providerText}>Proveedor IA: {providerSummary(summary)}</Text>
@@ -162,11 +162,11 @@ export default function SessionDetailScreen() {
               )}
             </View>
             <View style={styles.dangerZone}>
-              <Text style={styles.dangerTitle}>Eliminar sesion</Text>
-              <Text style={styles.dangerText}>La sesion se ocultara y dejara de contar para estadisticas y rango.</Text>
+              <Text style={styles.dangerTitle}>Eliminar sesión</Text>
+              <Text style={styles.dangerText}>La sesión se ocultara y dejara de contar para estadísticas y rango.</Text>
               {deleteConfirm && <Text style={styles.dangerText}>Pulsa otra vez para confirmar.</Text>}
-              <Pressable disabled={deleting} onPress={submitDelete} style={[styles.deleteButton, deleting && styles.disabled]}>
-                <Text style={styles.deleteText}>{deleting ? 'Eliminando...' : 'Eliminar sesion'}</Text>
+              <Pressable accessibilityRole="button" disabled={deleting} onPress={submitDelete} style={[styles.deleteButton, deleting && styles.disabled]}>
+                <Text style={styles.deleteText}>{deleting ? 'Eliminando...' : 'Eliminar sesión'}</Text>
               </Pressable>
             </View>
           </ZenithCard>
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   summaryResult: { backgroundColor: zenith.colors.background, borderRadius: 12, gap: 8, padding: 10 },
   summaryText: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, lineHeight: 20 },
   summaryGroup: { gap: 4 },
-  summaryGroupTitle: { color: zenith.colors.primary, fontFamily: zenith.font.mono, fontSize: 10, textTransform: 'uppercase' },
+  summaryGroupTitle: { color: zenith.colors.primary, fontFamily: zenith.font.mono, fontSize: 11, textTransform: 'uppercase' },
   summaryItem: { color: zenith.colors.foreground, fontFamily: zenith.font.body, lineHeight: 20 },
   warningItem: { color: '#fca5a5', lineHeight: 20 },
   providerText: { color: zenith.colors.cyan, fontFamily: zenith.font.mono, fontSize: 11 },

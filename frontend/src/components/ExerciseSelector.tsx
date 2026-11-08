@@ -43,10 +43,10 @@ export function ExerciseSelector({ label, exercises, selectedExerciseId, onSelec
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
-      <Pressable onPress={() => setOpen((current) => !current)} style={styles.selectedButton}>
+      <Pressable accessibilityRole="button" onPress={() => setOpen((current) => !current)} style={styles.selectedButton}>
         <View style={styles.selectedTextBlock}>
           <Text style={styles.selectedName}>{selected?.name ?? 'Selecciona ejercicio'}</Text>
-          <Text style={styles.selectedMeta}>{selected ? exerciseMeta(selected) : 'Buscar por nombre, musculo o equipo'}</Text>
+          <Text style={styles.selectedMeta}>{selected ? exerciseMeta(selected) : 'Buscar por nombre, músculo o equipo'}</Text>
         </View>
         <Text style={styles.toggleText}>{open ? 'Cerrar' : 'Cambiar'}</Text>
       </Pressable>
@@ -63,7 +63,7 @@ export function ExerciseSelector({ label, exercises, selectedExerciseId, onSelec
             value={query}
           />
 
-          <FilterChips label="Musculo" options={muscleOptions} selectedValue={muscle} onChange={setMuscle} />
+          <FilterChips label="Músculo" options={muscleOptions} selectedValue={muscle} onChange={setMuscle} />
           <FilterChips label="Equipo" options={equipmentOptions} selectedValue={equipment} onChange={setEquipment} />
           <FilterChips
             label="Dificultad"
@@ -73,7 +73,7 @@ export function ExerciseSelector({ label, exercises, selectedExerciseId, onSelec
           />
 
           {hasFilters && (
-            <Pressable onPress={clearFilters} style={styles.clearButton}>
+            <Pressable accessibilityRole="button" onPress={clearFilters} style={styles.clearButton}>
               <Text style={styles.clearText}>Limpiar filtros</Text>
             </Pressable>
           )}
@@ -83,7 +83,7 @@ export function ExerciseSelector({ label, exercises, selectedExerciseId, onSelec
             {filteredExercises.map((exercise) => {
               const selectedExercise = exercise.id === selectedExerciseId;
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={exercise.id}
                   onPress={() => selectExercise(exercise.id)}
                   style={[styles.resultCard, selectedExercise && styles.resultCardSelected]}
@@ -131,7 +131,7 @@ function FilterChips({
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}>
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </Pressable>
   );
@@ -198,7 +198,7 @@ function exerciseMeta(exercise: Exercise) {
 
 const styles = StyleSheet.create({
   container: { gap: 8 },
-  label: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase' },
+  label: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' },
   selectedButton: { alignItems: 'center', backgroundColor: zenith.colors.secondary, borderColor: zenith.colors.border, borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 14 },
   selectedTextBlock: { flex: 1, gap: 4 },
   selectedName: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, fontSize: 16 },
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   toggleText: { color: zenith.colors.primary, fontFamily: zenith.font.bodyBold, fontSize: 13 },
   panel: { backgroundColor: zenith.colors.background, borderColor: zenith.colors.border, borderRadius: 16, borderWidth: 1, gap: 14, padding: 12 },
   filterGroup: { gap: 8 },
-  filterLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, textTransform: 'uppercase' },
+  filterLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, textTransform: 'uppercase' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderColor: zenith.colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
   chipSelected: { backgroundColor: zenith.colors.primary, borderColor: zenith.colors.primary },
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   resultCardSelected: { borderColor: zenith.colors.primary },
   resultHeader: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   resultName: { color: zenith.colors.foreground, flex: 1, fontFamily: zenith.font.bodyBold, fontSize: 15 },
-  badge: { backgroundColor: zenith.colors.secondary, borderRadius: 999, color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  badge: { backgroundColor: zenith.colors.secondary, borderRadius: 999, color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, paddingHorizontal: 8, paddingVertical: 4 },
   badgeSelected: { backgroundColor: zenith.colors.primary, color: zenith.colors.primaryForeground },
   resultMeta: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 12, lineHeight: 17 },
   description: { color: zenith.colors.foreground, fontFamily: zenith.font.body, fontSize: 12, lineHeight: 17 },

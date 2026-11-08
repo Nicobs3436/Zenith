@@ -1,5 +1,5 @@
 import { Link, LinkProps, usePathname } from 'expo-router';
-import { BarChart3, Bot, ClipboardList, Dumbbell, Home, LucideIcon, Zap } from 'lucide-react-native';
+import { BarChart3, Bot, Check, ClipboardList, Dumbbell, Home, LucideIcon, Zap } from 'lucide-react-native';
 import { PropsWithChildren, ReactNode } from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 
@@ -47,7 +47,8 @@ export function ZenithButton({ disabled, icon, onPress, title, variant = 'primar
   variant?: 'primary' | 'secondary' | 'danger';
 }) {
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -64,12 +65,31 @@ export function ZenithButton({ disabled, icon, onPress, title, variant = 'primar
   );
 }
 
-export function ZenithIconButton({ children, href, onPress, style }: PropsWithChildren<{ href?: LinkProps['href']; onPress?: () => void; style?: StyleProp<ViewStyle> }>) {
+export function ZenithIconButton({ children, href, label, onPress, style }: PropsWithChildren<{ href?: LinkProps['href']; label: string; onPress?: () => void; style?: StyleProp<ViewStyle> }>) {
+  // Botones solo-icono: el label es obligatorio para lectores de pantalla (WCAG 4.1.2).
   const content = <View style={StyleSheet.flatten([styles.iconButton, style])}>{children}</View>;
   if (href) {
-    return <Link href={href} asChild><Pressable>{content}</Pressable></Link>;
+    return <Link href={href} asChild><Pressable accessibilityLabel={label} accessibilityRole="link" hitSlop={4}>{content}</Pressable></Link>;
   }
-  return <Pressable onPress={onPress}>{content}</Pressable>;
+  return <Pressable accessibilityLabel={label} accessibilityRole="button" hitSlop={4} onPress={onPress}>{content}</Pressable>;
+}
+
+export function ZenithCheckbox({ checked, label, onChange, tone = 'primary' }: { checked: boolean; label: string; onChange: (checked: boolean) => void; tone?: 'primary' | 'danger' }) {
+  const accent = tone === 'danger' ? zenith.colors.danger : zenith.colors.primary;
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      onPress={() => onChange(!checked)}
+      style={[styles.checkbox, checked && { borderColor: accent }]}
+    >
+      <View style={[styles.checkboxBox, checked && { backgroundColor: accent, borderColor: accent }]}>
+        {checked && <Check color={zenith.colors.primaryForeground} size={14} strokeWidth={3} />}
+      </View>
+      <Text style={styles.checkboxLabel}>{label}</Text>
+    </Pressable>
+  );
 }
 
 export function ZenithNotice({ children, tone = 'neutral' }: PropsWithChildren<{ tone?: 'neutral' | 'success' | 'danger' | 'warning' }>) {
@@ -93,7 +113,7 @@ const navItems: { href: LinkProps['href']; label: string; match: string; icon: L
   { href: '/dashboard', label: 'Inicio', match: '/dashboard', icon: Home },
   { href: '/routines', label: 'Rutinas', match: '/routines', icon: ClipboardList },
   { href: '/exercises', label: 'Ejercicios', match: '/exercises', icon: Dumbbell },
-  { href: '/stats', label: 'Stats', match: '/stats', icon: BarChart3 },
+  { href: '/stats', label: 'Progreso', match: '/stats', icon: BarChart3 },
   { href: '/coach' as never, label: 'Coach', match: '/coach', icon: Bot },
 ];
 
@@ -106,7 +126,7 @@ export function ZenithBottomNav() {
         const Icon = item.icon;
         return (
           <Link key={item.match} href={item.href} asChild>
-            <Pressable style={styles.navItem}>
+            <Pressable accessibilityLabel={item.label} accessibilityRole="link" accessibilityState={{ selected: active }} style={styles.navItem}>
               <Icon color={active ? zenith.colors.primary : zenith.colors.muted} size={20} />
               <Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text>
               {active && <View style={styles.navDot} />}
@@ -145,6 +165,33 @@ const noticeStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  checkbox: {
+    alignItems: 'center',
+    borderColor: zenith.colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  checkboxBox: {
+    alignItems: 'center',
+    borderColor: zenith.colors.muted,
+    borderRadius: 6,
+    borderWidth: 2,
+    height: 22,
+    justifyContent: 'center',
+    width: 22,
+  },
+  checkboxLabel: {
+    color: zenith.colors.foreground,
+    flex: 1,
+    fontFamily: zenith.font.bodyMedium,
+    fontSize: 15,
+    lineHeight: 20,
+  },
   header: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -158,7 +205,7 @@ const styles = StyleSheet.create({
   eyebrow: {
     color: zenith.colors.muted,
     fontFamily: zenith.font.mono,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 2,
     textTransform: 'uppercase',
   },
@@ -180,7 +227,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: zenith.colors.primary,
     borderRadius: 12,
-    height: 38,
+    height: 44,
     justifyContent: 'center',
     width: 38,
   },
@@ -209,7 +256,7 @@ const styles = StyleSheet.create({
   pill: {
     borderRadius: zenith.radius.pill,
     fontFamily: zenith.font.mono,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     overflow: 'hidden',
     paddingHorizontal: 9,
@@ -280,7 +327,7 @@ const styles = StyleSheet.create({
   statLabel: {
     color: zenith.colors.muted,
     fontFamily: zenith.font.mono,
-    fontSize: 9,
+    fontSize: 11,
     textTransform: 'uppercase',
   },
   statValue: {
@@ -317,7 +364,7 @@ const styles = StyleSheet.create({
   navText: {
     color: zenith.colors.muted,
     fontFamily: zenith.font.mono,
-    fontSize: 10,
+    fontSize: 11,
   },
   navTextActive: {
     color: zenith.colors.primary,

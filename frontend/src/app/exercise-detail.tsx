@@ -79,20 +79,20 @@ export default function ExerciseDetailScreen() {
           </ZenithCard>
 
           <View style={styles.metaGrid}>
-            <InfoCard label="Musculos" value={referenceNames(exercise.muscle_groups)} />
+            <InfoCard label="Músculos" value={referenceNames(exercise.muscle_groups)} />
             <InfoCard label="Equipo" value={referenceNames(exercise.equipment)} />
           </View>
 
           {exercise.description && (
             <ZenithCard style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Descripcion</Text>
+              <Text style={styles.sectionTitle}>Descripción</Text>
               <Text style={styles.body}>{exercise.description}</Text>
             </ZenithCard>
           )}
 
           {exercise.technique_notes && (
             <ZenithCard style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Tecnica</Text>
+              <Text style={styles.sectionTitle}>Técnica</Text>
               <Text style={styles.body}>{exercise.technique_notes}</Text>
             </ZenithCard>
           )}
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   meta: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 12 },
   metaGrid: { flexDirection: 'row', gap: 10 },
   infoCard: { flex: 1, gap: 6, padding: 13 },
-  infoLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, textTransform: 'uppercase' },
+  infoLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, textTransform: 'uppercase' },
   infoValue: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, lineHeight: 20 },
   sectionCard: { gap: 8 },
   sectionTitle: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 22, lineHeight: 24, textTransform: 'uppercase' },

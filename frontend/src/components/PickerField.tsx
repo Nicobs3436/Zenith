@@ -32,7 +32,7 @@ export function PickerField({ label, options, selectedValue, onValueChange }: Pi
 
 const styles = StyleSheet.create({
   container: { gap: 8 },
-  label: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase' },
+  label: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' },
   pickerFrame: {
     backgroundColor: zenith.colors.primary,
     borderColor: zenith.colors.primaryBorder,

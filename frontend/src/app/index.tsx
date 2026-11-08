@@ -25,17 +25,18 @@ export default function IndexScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.hero}>
-        <Text style={styles.brand}>ZENITH</Text>
+        <Text accessibilityRole="header" style={styles.brand}>ZENITH</Text>
+        <Text style={styles.tagline}>Planifica tus rutinas, registra cada serie y progresa con un Coach con IA.</Text>
         {checking && <View style={styles.checkingDot} />}
       </View>
       <View style={styles.actions}>
-        <Link href="/login" style={styles.primaryLink}>Iniciar sesion</Link>
+        <Link href="/login" style={styles.primaryLink}>Iniciar sesión</Link>
         <Link href="/register" style={styles.secondaryLink}>Crear cuenta</Link>
       </View>
       <View style={styles.legalLinks}>
         <Link href={'/privacy' as never} style={styles.legalLink}>Privacidad</Link>
         <Text style={styles.legalSeparator}>/</Text>
-        <Link href={'/terms' as never} style={styles.legalLink}>Terminos y condiciones</Link>
+        <Link href={'/terms' as never} style={styles.legalLink}>Términos y condiciones</Link>
       </View>
     </SafeAreaView>
   );
@@ -50,6 +51,7 @@ const styles = StyleSheet.create({
   },
   hero: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   brand: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 76, fontWeight: '900', letterSpacing: 8, lineHeight: 82 },
+  tagline: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 17, lineHeight: 24, marginTop: 12, maxWidth: 320, textAlign: 'center' },
   checkingDot: { backgroundColor: zenith.colors.primary, borderRadius: 999, height: 7, marginTop: 12, width: 7 },
   actions: {
     gap: 12,

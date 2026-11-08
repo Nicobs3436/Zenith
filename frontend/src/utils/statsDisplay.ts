@@ -74,7 +74,7 @@ export function buildStatsChart(points: ExerciseStatsPoint[]) {
 export function buildMetricStatsChart(points: ExerciseStatsPoint[], metric: StatsChartMetric) {
   const labels: Record<StatsChartMetric, string> = {
     estimated_1rm: '1RM estimado',
-    max_weight: 'Peso maximo',
+    max_weight: 'Peso máximo',
     volume: 'Volumen total',
   };
   const valueForPoint = (point: ExerciseStatsPoint) => {

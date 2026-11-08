@@ -57,6 +57,16 @@ export function normalizeDecimalInput(value: string) {
   return value.trim().replace(',', '.');
 }
 
+// Fecha legible en hora local del dispositivo: "2026-07-02 10:05". Es lo que el usuario edita.
+export function formatLocalDateTime(value: Date | string) {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const pad = (part: number) => part.toString().padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 // Convierte la fecha escrita por el usuario a ISO con zona. Sin offset se interpreta como hora local
 // del dispositivo (lo que el usuario ve), nunca como UTC silencioso. Devuelve null si no es valida.
 export function toIsoDateTime(value: string): string | null {
@@ -79,7 +89,7 @@ function parseOptionalNumber(value: string, label: string, min: number, max?: nu
   }
   const parsed = Number(trimmed);
   if (Number.isNaN(parsed) || parsed < min || (max !== undefined && parsed > max)) {
-    return { value: null, error: `${label} no es valido.` };
+    return { value: null, error: `${label} no es válido.` };
   }
   return { value: parsed, error: null };
 }
@@ -91,7 +101,7 @@ function parseOptionalInteger(value: string, label: string, min: number) {
   }
   const parsed = Number(trimmed);
   if (!Number.isInteger(parsed) || parsed < min) {
-    return { value: null, error: `${label} no es valido.` };
+    return { value: null, error: `${label} no es válido.` };
   }
   return { value: parsed, error: null };
 }
@@ -106,7 +116,7 @@ export function buildWorkoutSets(rows: SetRow[]): BuildSetsResult {
 
     const reps = Number(row.reps.trim());
     if (!Number.isInteger(reps) || reps < 0 || reps > MAX_REPS) {
-      return { sets: null, error: `Las reps de la serie ${index + 1} no son validas.` };
+      return { sets: null, error: `Las reps de la serie ${index + 1} no son válidas.` };
     }
 
     const weight = parseOptionalNumber(row.weight_value, `El peso de la serie ${index + 1}`, 0, MAX_WEIGHT);
