@@ -43,7 +43,16 @@ def client_with_db() -> Generator[tuple[TestClient, SessionFactory], None, None]
 
 def register_and_login(client: TestClient, email: str, username: str) -> str:
     password = "password123"
-    client.post("/auth/register", json={"email": email, "username": username, "password": password})
+    client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "username": username,
+            "password": password,
+            "accepted_terms": True,
+            "adult_confirmed": True,
+        },
+    )
     response = client.post("/auth/login", json={"email": email, "password": password})
     return response.json()["access_token"]
 
@@ -723,3 +732,25 @@ def test_workout_session_dates_are_returned_with_timezone(client_with_db: tuple[
 
     assert fetched["started_at"] in {"2026-07-02T16:00:00Z", "2026-07-02T16:00:00+00:00"}
     assert resent.status_code == 200
+
+
+def test_create_workout_session_is_idempotent_with_client_request_id(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "client_request_id": "6f1c1b8e-2d7a-4a55-9a52-6f0d7a1c2b3d",
+        "started_at": datetime(2026, 7, 2, 10, 0, tzinfo=UTC).isoformat(),
+        "timezone": "Europe/Madrid",
+        "sets": [{"exercise_id": str(exercise.id), "set_number": 1, "reps": 5}],
+    }
+
+    first = client.post("/workout-sessions", headers=headers, json=payload)
+    retry = client.post("/workout-sessions", headers=headers, json=payload)
+
+    assert first.status_code == retry.status_code == 201
+    assert first.json()["id"] == retry.json()["id"]
+    assert len(client.get("/workout-sessions", headers=headers).json()) == 1

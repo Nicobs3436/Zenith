@@ -26,6 +26,7 @@ from app.domain.ai import (
     CoachPlanDraftReviseRequest,
     CoachStateRead,
 )
+from app.domain.users import MIN_USER_AGE
 from app.infrastructure.db.models.ai import AiTrainingPlan, CoachConversation, CoachProfile
 from app.infrastructure.db.models.user import User
 from app.infrastructure.db.repositories.coach import CoachRepository
@@ -434,7 +435,7 @@ class CoachService:
             elif re.search(r"\b(avanzado|experto)\b", text):
                 updates["experience_level"] = "advanced"
         if profile.age is None:
-            match = re.search(r"\b(1[4-9]|[2-8][0-9]|90)\s*(anos|a\.?|edad)\b", text)
+            match = re.search(r"\b(1[8-9]|[2-8][0-9]|90)\s*(anos|a\.?|edad)\b", text)
             if match:
                 updates["age"] = int(match.group(1))
         if profile.height_cm is None:
@@ -488,7 +489,7 @@ class CoachService:
         if field == "experience_level":
             return value if isinstance(value, str) and value in LEVELS else _SKIP
         if field == "age":
-            return value if isinstance(value, int) and 14 <= value <= 90 else _SKIP
+            return value if isinstance(value, int) and MIN_USER_AGE <= value <= 90 else _SKIP  # edad minima de la app
         if field == "height_cm":
             return value if isinstance(value, int) and 120 <= value <= 230 else _SKIP
         if field == "weight_kg":

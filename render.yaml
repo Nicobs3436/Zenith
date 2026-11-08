@@ -24,3 +24,17 @@ services:
         sync: false
       - key: APP_AI_GROQ_MODEL
         value: llama-3.3-70b-versatile
+      - key: APP_EMAIL_PROVIDER
+        value: smtp
+      - key: APP_EMAIL_FROM
+        sync: false
+      - key: APP_SMTP_HOST
+        value: smtp.gmail.com
+      - key: APP_SMTP_USERNAME
+        sync: false
+      - key: APP_SMTP_PASSWORD
+        sync: false
+      - key: APP_FRONTEND_BASE_URL
+        sync: false
+      - key: APP_SENTRY_DSN
+        sync: false

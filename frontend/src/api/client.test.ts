@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
-  const state: { accessToken: string | null; refreshToken: string | null } = {
+  const state: { accessToken: string | null; refreshToken: string | null; web: boolean } = {
     accessToken: null,
     refreshToken: null,
+    web: false,
   };
   const tokenStorage = {
     getAccessToken: vi.fn(async () => state.accessToken),
     getRefreshToken: vi.fn(async () => state.refreshToken),
     loadAuthTokens: vi.fn(async () => ({ accessToken: state.accessToken, refreshToken: state.refreshToken })),
-    setAuthTokens: vi.fn(async (tokens: { accessToken: string; refreshToken: string }) => {
+    usesCookieSession: vi.fn(() => state.web),
+    setAuthTokens: vi.fn(async (tokens: { accessToken: string; refreshToken: string | null }) => {
       state.accessToken = tokens.accessToken;
       state.refreshToken = tokens.refreshToken;
     }),
@@ -45,6 +47,7 @@ async function loadClient() {
 describe('api client auth refresh', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.state.web = false;
     mocks.state.accessToken = 'old-access-token';
     mocks.state.refreshToken = 'old-refresh-token';
   });
@@ -105,7 +108,7 @@ describe('api client auth refresh', () => {
     vi.stubGlobal('fetch', fetchMock);
     const client = await loadClient();
 
-    await expect(client.getMe()).rejects.toThrow('Network request failed');
+    await expect(client.getMe()).rejects.toBeInstanceOf(client.NetworkError);
 
     expect(mocks.tokenStorage.clearAuthTokens).not.toHaveBeenCalled();
     expect(mocks.state.refreshToken).toBe('old-refresh-token');
@@ -451,5 +454,63 @@ describe('account endpoints', () => {
 
     await expect(client.deleteAccount('wrong')).rejects.toThrow('Contraseña incorrecta.');
     expect(mocks.state.refreshToken).toBe('refresh-token');
+  });
+});
+
+describe('web cookie session', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.state.web = true;
+    mocks.state.accessToken = null;
+    mocks.state.refreshToken = null;
+  });
+
+  it('restores the session from the httpOnly cookie without any stored token', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'cookie-access', refresh_token: null }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'user-1', email: 'a@b.com', username: 'ana' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = await loadClient();
+
+    await expect(client.restoreSession()).resolves.toMatchObject({ username: 'ana' });
+
+    const [refreshUrl, refreshInit] = fetchMock.mock.calls[0];
+    expect(refreshUrl).toBe('http://localhost:8000/auth/refresh');
+    expect(refreshInit).toMatchObject({ method: 'POST', credentials: 'include', body: undefined });
+    expect((refreshInit?.headers as Record<string, string>)['X-Zenith-Client']).toBe('web');
+    expect(mocks.state.accessToken).toBe('cookie-access');
+  });
+
+  it('logs out on web through the cookie without sending a token in the body', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(emptyResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const client = await loadClient();
+
+    await client.logout();
+
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8000/auth/logout', expect.objectContaining({ body: undefined, credentials: 'include' }));
+    expect(mocks.tokenStorage.clearAuthTokens).toHaveBeenCalledOnce();
+  });
+
+  it('sends password reset and verification requests', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ detail: 'ok' }, 202))
+      .mockResolvedValueOnce(emptyResponse())
+      .mockResolvedValueOnce(emptyResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const client = await loadClient();
+
+    await client.requestPasswordReset('a@b.com');
+    await client.confirmPasswordReset('reset-token', 'new-password-1');
+    await client.verifyEmail('verify-token');
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'http://localhost:8000/auth/password-reset/request',
+      'http://localhost:8000/auth/password-reset/confirm',
+      'http://localhost:8000/auth/verify-email',
+    ]);
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ body: JSON.stringify({ token: 'reset-token', new_password: 'new-password-1' }) });
   });
 });

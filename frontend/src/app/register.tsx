@@ -16,6 +16,7 @@ export default function RegisterScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -26,6 +27,10 @@ export default function RegisterScreen() {
     }
     if (password.length < 8) {
       setError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    if (!adultConfirmed) {
+      setError('Zenith es solo para mayores de 18 años.');
       return;
     }
     if (!acceptedTerms) {
@@ -61,6 +66,7 @@ export default function RegisterScreen() {
           <Text style={styles.separator}>/</Text>
           <Link href={'/terms' as never} style={styles.link}>Términos</Link>
         </View>
+        <ZenithCheckbox checked={adultConfirmed} label="Confirmo que tengo 18 años o más" onChange={setAdultConfirmed} />
         <ZenithCheckbox checked={acceptedTerms} label="Acepto privacidad, términos y aviso médico" onChange={setAcceptedTerms} />
       </ZenithCard>
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}

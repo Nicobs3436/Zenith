@@ -21,7 +21,7 @@ from app.infrastructure.db.models.ai import (
     CoachProfile,
     CoachProposal,
 )
-from app.infrastructure.db.models.auth import RefreshToken
+from app.infrastructure.db.models.auth import EmailToken, RefreshToken
 from app.infrastructure.db.models.exercise import Exercise, exercise_equipment, exercise_muscle_groups
 from app.infrastructure.db.models.rank import UserRankProgress
 from app.infrastructure.db.models.routine import Routine, RoutineExercise
@@ -118,6 +118,7 @@ class AccountService:
         for model in USER_OWNED_MODELS:
             db.execute(delete(model).where(model.user_id == user_id))
         db.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id))
+        db.execute(delete(EmailToken).where(EmailToken.user_id == user_id))
         db.execute(delete(WorkoutSet).where(WorkoutSet.session_id.in_(session_ids)))
         db.execute(delete(WorkoutSession).where(WorkoutSession.user_id == user_id))
         db.execute(delete(RoutineExercise).where(RoutineExercise.routine_id.in_(routine_ids)))

@@ -3,10 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.core.observability import init_sentry
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    init_sentry(settings)
     app = FastAPI(title=settings.app_name)
     app.add_middleware(
         CORSMiddleware,

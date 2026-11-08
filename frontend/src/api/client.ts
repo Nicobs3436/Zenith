@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 
-import { clearAuthTokens, getAccessToken, getRefreshToken, loadAuthTokens, setAuthTokens } from '@/auth/tokenStorage';
+import { clearAuthTokens, getAccessToken, getRefreshToken, loadAuthTokens, setAuthTokens, usesCookieSession } from '@/auth/tokenStorage';
 import { API_URL } from '@/config/env';
 import { SESSION_EXPIRED_NOTICE } from '@/utils/authDisplay';
 
@@ -21,7 +21,8 @@ const API_TIMEOUT_MESSAGE = 'La API tardo demasiado en responder. Intentalo de n
 
 type TokenResponse = {
   access_token: string;
-  refresh_token: string;
+  // null en web: el refresh token llega en una cookie httpOnly.
+  refresh_token: string | null;
 };
 
 let refreshInFlight: Promise<boolean> | null = null;
@@ -36,6 +37,16 @@ export class ApiError extends Error {
   }
 }
 
+// Sin conexion o servidor inalcanzable: mensaje comprensible en vez de "Failed to fetch".
+export const NETWORK_ERROR_MESSAGE = 'Sin conexión con el servidor. Comprueba tu conexión e inténtalo de nuevo.';
+
+export class NetworkError extends Error {
+  constructor() {
+    super(NETWORK_ERROR_MESSAGE);
+    this.name = 'NetworkError';
+  }
+}
+
 export class AuthExpiredError extends Error {
   constructor() {
     super(SESSION_EXPIRED_NOTICE);
@@ -47,6 +58,7 @@ export type User = {
   id: string;
   email: string;
   username: string;
+  email_verified?: boolean;
 };
 
 export type Rank = { id: string; name: string; description: string | null; min_score: string; sort_order: number };
@@ -294,6 +306,8 @@ export type WorkoutSet = {
 };
 
 export type WorkoutSessionPayload = {
+  // Id generado en el movil: reintentar el envio (cola sin conexion) no duplica la sesion.
+  client_request_id?: string;
   routine_id?: string | null;
   started_at: string;
   finished_at?: string | null;
@@ -526,6 +540,10 @@ function normalizeWorkoutSessions(value: unknown): WorkoutSession[] {
 
 async function request<T>(path: string, options: RequestOptions = {}, retryOnUnauthorized = true): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (usesCookieSession()) {
+    // Identifica a la web: la API usa la cookie httpOnly solo con esta cabecera (proteccion CSRF).
+    headers['X-Zenith-Client'] = 'web';
+  }
   const token = await getAccessToken();
   if (options.auth && token) {
     headers.Authorization = `Bearer ${token}`;
@@ -540,12 +558,13 @@ async function request<T>(path: string, options: RequestOptions = {}, retryOnUna
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
+      ...(usesCookieSession() ? { credentials: 'include' as RequestCredentials } : {}),
     });
   } catch (error) {
     if (isAbortError(error)) {
       throw new Error(API_TIMEOUT_MESSAGE);
     }
-    throw error;
+    throw new NetworkError();
   } finally {
     clearTimeout(timeoutId);
   }
@@ -581,7 +600,7 @@ async function refreshSession() {
 
 async function refreshAccessToken() {
   const refreshToken = await getRefreshToken();
-  if (!refreshToken) {
+  if (!refreshToken && !usesCookieSession()) {
     return false;
   }
 
@@ -590,7 +609,8 @@ async function refreshAccessToken() {
       '/auth/refresh',
       {
         method: 'POST',
-        body: { refresh_token: refreshToken },
+        // En web el refresh token viaja en la cookie; no hay cuerpo.
+        body: refreshToken ? { refresh_token: refreshToken } : undefined,
       },
       false,
     );
@@ -649,9 +669,10 @@ export async function login(email: string, password: string) {
 }
 
 export async function register(email: string, username: string, password: string) {
+  // La pantalla solo llama aqui con ambas casillas marcadas; el backend exige los dos consentimientos.
   await request<User>('/auth/register', {
     method: 'POST',
-    body: { email, username, password },
+    body: { email, username, password, accepted_terms: true, adult_confirmed: true },
   });
   await login(email, password);
 }
@@ -662,7 +683,7 @@ export function getMe() {
 
 export async function restoreSession() {
   const tokens = await loadAuthTokens();
-  if (!tokens.accessToken && !tokens.refreshToken) {
+  if (!tokens.accessToken && !tokens.refreshToken && !usesCookieSession()) {
     return null;
   }
   if (!tokens.accessToken && !(await refreshSession())) {
@@ -681,12 +702,12 @@ export async function restoreSession() {
 export async function logout() {
   const refreshToken = await getRefreshToken();
   try {
-    if (refreshToken) {
+    if (refreshToken || usesCookieSession()) {
       await request<void>(
         '/auth/logout',
         {
           method: 'POST',
-          body: { refresh_token: refreshToken },
+          body: refreshToken ? { refresh_token: refreshToken } : undefined,
         },
         false,
       );
@@ -928,4 +949,20 @@ export async function deleteAccount(password: string) {
   await request<void>('/users/me', { method: 'DELETE', auth: true, body: { password } });
   // El backend ya revoco los refresh tokens al borrar la cuenta; solo queda limpiar el dispositivo.
   await clearAuthTokens();
+}
+
+export function requestPasswordReset(email: string) {
+  return request<{ detail: string }>('/auth/password-reset/request', { method: 'POST', body: { email } });
+}
+
+export function confirmPasswordReset(token: string, newPassword: string) {
+  return request<void>('/auth/password-reset/confirm', { method: 'POST', body: { token, new_password: newPassword } });
+}
+
+export function verifyEmail(token: string) {
+  return request<void>('/auth/verify-email', { method: 'POST', body: { token } });
+}
+
+export function resendVerificationEmail() {
+  return request<{ detail: string }>('/auth/verify-email/resend', { method: 'POST', auth: true });
 }

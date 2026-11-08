@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.application.rank_service import rank_service
@@ -103,6 +104,11 @@ class RoutineService:
         routine_repository = RoutineRepository(db)
         session_repository = WorkoutSessionRepository(db)
 
+        if data.client_request_id is not None:
+            existing = session_repository.get_by_client_request(user.id, data.client_request_id)
+            if existing is not None:
+                return existing
+
         if data.routine_id is not None and routine_repository.get_by_user(data.routine_id, user.id) is None:
             raise RoutineReferenceError("routine_id")
 
@@ -117,6 +123,7 @@ class RoutineService:
             finished_at=data.finished_at,
             timezone=data.timezone,
             notes=data.notes,
+            client_request_id=data.client_request_id,
         )
         for workout_set in data.sets:
             session_repository.add_set(
@@ -131,7 +138,15 @@ class RoutineService:
                 rest_seconds=workout_set.rest_seconds,
                 notes=workout_set.notes,
             )
-        saved_session = session_repository.save_and_get(session)
+        try:
+            saved_session = session_repository.save_and_get(session)
+        except IntegrityError:
+            # Dos reintentos simultaneos de la misma sesion: gana el primero, el otro la devuelve.
+            db.rollback()
+            existing = session_repository.get_by_client_request(user.id, data.client_request_id)
+            if existing is None:
+                raise
+            return existing
         self._recalculate_rank_if_seeded(db, user)
         return saved_session
 

@@ -21,7 +21,7 @@ export default function LoginScreen() {
 
   async function submit() {
     if (!email.trim() || !password) {
-      setError('Email y password son obligatorios.');
+      setError('Email y contraseña son obligatorios.');
       return;
     }
     setLoading(true);
@@ -47,6 +47,7 @@ export default function LoginScreen() {
         <Field autoCapitalize="none" autoComplete="current-password" label="Contraseña" onChangeText={setPassword} onSubmitEditing={submit} returnKeyType="go" secureTextEntry textContentType="password" value={password} />
         {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
         <PrimaryButton disabled={loading} onPress={submit} title={loading ? 'Entrando...' : 'Iniciar sesión'} />
+        <Link accessibilityRole="link" href={'/forgot-password' as never} style={styles.forgot}>¿Has olvidado tu contraseña?</Link>
       </ZenithCard>
       <View style={styles.legalCard}>
         <Text style={styles.legalText}>Al usar Zenith aceptas el aviso médico de beta, privacidad y términos.</Text>
@@ -63,6 +64,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   subtitle: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 15, lineHeight: 22 },
   card: { gap: 14 },
+  forgot: { alignSelf: 'center', color: zenith.colors.primary, fontFamily: zenith.font.bodyBold, paddingVertical: 12 },
   legalCard: { backgroundColor: zenith.colors.secondary, borderColor: zenith.colors.border, borderRadius: 16, borderWidth: 1, gap: 10, padding: 14 },
   legalText: {
     color: zenith.colors.muted,

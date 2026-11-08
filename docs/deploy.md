@@ -12,6 +12,8 @@ Desplegar Zenith con coste 0 para staging/beta inicial:
 
 No se incluye publicacion en App Store o Google Play porque no es coste 0.
 
+Pasos de configuracion de produccion (emails, cookie, Sentry, UptimeRobot, backups, legal): ver `docs/production-checklist.md`.
+
 ## URLs
 
 - Frontend Vercel: `https://<vercel-project>.vercel.app`.

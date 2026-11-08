@@ -585,3 +585,20 @@ def test_coach_ignores_malformed_list_updates_instead_of_erasing_them(
 
     assert response.status_code == 200
     assert "mancuernas" in response.json()["profile"]["equipment"]
+
+
+def test_coach_never_stores_an_age_under_18(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, _session_factory = client_with_db
+    minor = json.loads(json.loads(empty_interview_response())["choices"][0]["message"]["content"])
+    minor["profile_updates"] = {"age": 16}
+    use_fake_groq_sequence(monkeypatch, [groq_chat_response(minor)])
+    token = register_and_login(client, "coach-minor@example.com", "coach_minor")
+
+    response = client.post(
+        "/ai/coach/messages",
+        headers=auth_headers(token),
+        json={"message": "Tengo 16 anos", "personal_data_acknowledged": True},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["profile"]["age"] is None

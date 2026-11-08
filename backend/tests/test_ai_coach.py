@@ -47,7 +47,16 @@ def client_with_db() -> Generator[tuple[TestClient, SessionFactory], None, None]
 
 def register_and_login(client: TestClient, email: str, username: str) -> str:
     password = "password123"
-    client.post("/auth/register", json={"email": email, "username": username, "password": password})
+    client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "username": username,
+            "password": password,
+            "accepted_terms": True,
+            "adult_confirmed": True,
+        },
+    )
     response = client.post("/auth/login", json={"email": email, "password": password})
     return response.json()["access_token"]
 
