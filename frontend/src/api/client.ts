@@ -919,3 +919,13 @@ export function getExerciseStatsDetail(
   }
   return request<ExerciseStatsDetail>(`/stats/exercises/${exerciseId}?${params.toString()}`, { auth: true });
 }
+
+export function exportAccountData() {
+  return request<Record<string, unknown>>('/users/me/export', { auth: true });
+}
+
+export async function deleteAccount(password: string) {
+  await request<void>('/users/me', { method: 'DELETE', auth: true, body: { password } });
+  // El backend ya revoco los refresh tokens al borrar la cuenta; solo queda limpiar el dispositivo.
+  await clearAuthTokens();
+}

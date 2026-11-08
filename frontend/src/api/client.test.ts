@@ -417,3 +417,39 @@ describe('api client auth refresh', () => {
     expect(url).toContain('start_date=');
   });
 });
+
+describe('account endpoints', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.state.accessToken = 'access-token';
+    mocks.state.refreshToken = 'refresh-token';
+  });
+
+  it('exports data and deletes the account clearing local tokens', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ format_version: 1, routines: [] }))
+      .mockResolvedValueOnce(emptyResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const client = await loadClient();
+
+    await expect(client.exportAccountData()).resolves.toMatchObject({ format_version: 1 });
+    await client.deleteAccount('password123');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://localhost:8000/users/me/export', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://localhost:8000/users/me',
+      expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ password: 'password123' }) }),
+    );
+    expect(mocks.state.refreshToken).toBeNull();
+  });
+
+  it('keeps the session when the password is wrong', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({ detail: 'Contrasena incorrecta.' }, 403)));
+    const client = await loadClient();
+
+    await expect(client.deleteAccount('wrong')).rejects.toThrow('Contrasena incorrecta.');
+    expect(mocks.state.refreshToken).toBe('refresh-token');
+  });
+});

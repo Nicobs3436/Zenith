@@ -10,6 +10,8 @@ import { SegmentedField } from '@/components/SegmentedField';
 import { ZenithCard, ZenithNotice } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
+import { clearWorkoutDraft, loadWorkoutDraft, saveWorkoutDraft } from '@/storage/workoutDraft';
+import { restDeadline, secondsBetween, secondsUntil } from '@/utils/sessionTimers';
 import { buildWorkoutSets, SetRow, WeightUnit } from '@/utils/sessionForm';
 import { exerciseName, formatPlannedExercise, plannedRoutineExercises } from '@/utils/workoutDisplay';
 import { progressionHintForExercise } from '@/utils/progression';
@@ -85,28 +87,34 @@ export default function ActiveSessionScreen() {
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [previousSessions, setPreviousSessions] = useState<WorkoutSession[]>([]);
-  const [startedAt] = useState(new Date().toISOString());
-  const [timezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  const [startedAt, setStartedAt] = useState(new Date().toISOString());
+  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
   const [rows, setRows] = useState<ActiveSetRow[]>([]);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [restRemaining, setRestRemaining] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const [restored, setRestored] = useState(false);
+  const elapsedSeconds = secondsBetween(new Date(startedAt).getTime(), now);
+  const restRemaining = secondsUntil(restEndsAt, now);
   const [loading, setLoading] = useState(Boolean(id));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelConfirm, setCancelConfirm] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => setElapsedSeconds((current) => current + 1), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    if (restRemaining <= 0) {
+    if (!draftReady || !id || rows.length === 0) {
       return;
     }
-    const timer = setInterval(() => setRestRemaining((current) => Math.max(0, current - 1)), 1000);
-    return () => clearInterval(timer);
-  }, [restRemaining]);
+    const timer = setTimeout(() => {
+      saveWorkoutDraft({ version: 1, routineId: id, startedAt, timezone, restEndsAt, rows, savedAt: Date.now() }).catch(() => undefined);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [draftReady, id, rows, startedAt, timezone, restEndsAt]);
 
   useEffect(() => {
     const hasCompletedRows = rows.some((row) => row.completed);
@@ -134,12 +142,21 @@ export default function ActiveSessionScreen() {
     if (!id) {
       return;
     }
-    Promise.all([getRoutine(id), getExercises(), getWorkoutSessions()])
-      .then(([routineItem, exerciseItems, sessionItems]) => {
+    Promise.all([getRoutine(id), getExercises(), getWorkoutSessions(), loadWorkoutDraft<ActiveSetRow>(id)])
+      .then(([routineItem, exerciseItems, sessionItems, draft]) => {
         setRoutine(routineItem);
         setExercises(exerciseItems);
         setPreviousSessions(sessionItems);
-        setRows(buildRowsFromRoutine(routineItem));
+        if (draft) {
+          setRows(draft.rows);
+          setStartedAt(draft.startedAt);
+          setTimezone(draft.timezone);
+          setRestEndsAt(draft.restEndsAt);
+          setRestored(true);
+        } else {
+          setRows(buildRowsFromRoutine(routineItem));
+        }
+        setDraftReady(true);
       })
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Error'))
       .finally(() => setLoading(false));
@@ -196,7 +213,7 @@ export default function ActiveSessionScreen() {
     }
     const rowRest = Number(row.rest_seconds || plannedRestSeconds || 0);
     if (!Number.isNaN(rowRest) && rowRest > 0) {
-      setRestRemaining(rowRest);
+      setRestEndsAt(restDeadline(rowRest));
     }
   }
 
@@ -205,7 +222,7 @@ export default function ActiveSessionScreen() {
       setCancelConfirm(true);
       return;
     }
-    router.replace('/sessions');
+    clearWorkoutDraft().finally(() => router.replace('/sessions'));
   }
 
   async function finishSession() {
@@ -236,6 +253,7 @@ export default function ActiveSessionScreen() {
         notes: `Sesion guiada desde rutina: ${routine.name}`,
         sets: result.sets,
       });
+      await clearWorkoutDraft();
       router.replace('/sessions?notice=created');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No se pudo finalizar la sesion.');
@@ -286,11 +304,12 @@ export default function ActiveSessionScreen() {
             <View style={styles.restBox}>
               <Text style={styles.restTimer}>{formatDuration(restRemaining)}</Text>
               <Text style={styles.restLabel}>Descanso activo</Text>
-              <Pressable onPress={() => setRestRemaining(0)} style={styles.skipRest}><SkipForward color={zenith.colors.muted} size={12} /><Text style={styles.skipRestText}>Saltar</Text></Pressable>
+              <Pressable onPress={() => setRestEndsAt(null)} style={styles.skipRest}><SkipForward color={zenith.colors.muted} size={12} /><Text style={styles.skipRestText}>Saltar</Text></Pressable>
             </View>
           )}
         </ZenithCard>
       )}
+      {restored && <ZenithNotice>Hemos recuperado tu sesion en curso. Puedes seguir donde lo dejaste.</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
 
       {routine && activeRow && activePlanned && (
