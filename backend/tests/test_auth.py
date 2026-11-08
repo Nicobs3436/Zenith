@@ -37,8 +37,14 @@ def client() -> Generator[TestClient, None, None]:
         Base.metadata.drop_all(bind=engine)
 
 
-def user_payload(email: str = "test@example.com", username: str = "test_user") -> dict[str, str]:
-    return {"email": email, "username": username, "password": "password123"}
+def user_payload(email: str = "test@example.com", username: str = "test_user") -> dict:
+    return {
+        "email": email,
+        "username": username,
+        "password": "password123",
+        "accepted_terms": True,
+        "adult_confirmed": True,
+    }
 
 
 def test_register_user_returns_created_user_without_password_hash(client: TestClient) -> None:
@@ -236,3 +242,22 @@ def test_email_is_case_insensitive_for_register_and_login(client: TestClient) ->
     assert created.json()["email"] == "juan.perez@example.com"
     assert duplicate.status_code == 409
     assert login.status_code == 200
+
+
+def test_login_has_a_per_email_limit_even_when_ips_rotate(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setenv("APP_AUTH_LOGIN_EMAIL_RATE_LIMIT_ATTEMPTS", "3")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    client.post("/auth/register", json=user_payload())
+    statuses = [
+        client.post(
+            "/auth/login",
+            json={"email": "test@example.com", "password": "wrong-password"},
+            headers={"x-vercel-forwarded-for": f"203.0.113.{index}"},
+        ).status_code
+        for index in range(4)
+    ]
+    get_settings.cache_clear()
+
+    assert statuses == [401, 401, 401, 429]

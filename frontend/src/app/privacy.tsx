@@ -12,7 +12,8 @@ export default function PrivacyScreen() {
       <Text style={styles.text}>Zenith guarda datos de cuenta y entrenamiento para que puedas consultar rutinas, sesiones, estadísticas, rangos y recomendaciones.</Text>
       <ZenithCard style={styles.card}>
         <Text style={styles.cardTitle}>Datos que guardamos</Text>
-        <Text style={styles.item}>- Email, username y password hasheado.</Text>
+        <Text style={styles.item}>- Email, nombre de usuario y contraseña cifrada con hash.</Text>
+        <Text style={styles.item}>- Fecha en que aceptaste los términos y confirmaste tener 18 años o más.</Text>
         <Text style={styles.item}>- Ejercicios propios, rutinas, sesiones, series, pesos, unidades, RPE/RIR, descansos y notas.</Text>
         <Text style={styles.item}>- Sugerencias IA, planes adaptativos y resúmenes post-sesion generados para tu cuenta.</Text>
       </ZenithCard>

@@ -110,6 +110,8 @@ class WorkoutSetCreate(BaseModel):
 
 class WorkoutSessionCreate(BaseModel):
     routine_id: UUID | None = None
+    # Id generado por la app: reenviar la misma sesion (cola sin conexion) no la duplica.
+    client_request_id: UUID | None = None
     # Fechas con zona obligatoria: sin offset no se puede saber el instante real (no asumir UTC en silencio).
     started_at: AwareDatetime
     finished_at: AwareDatetime | None = None

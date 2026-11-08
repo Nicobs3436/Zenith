@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { createWorkoutSession, Exercise, getExercises, getRoutine, getWorkoutSessions, Routine, WorkoutSession } from '@/api/client';
+import { enqueueSession, newClientRequestId } from '@/storage/sessionOutbox';
+import { isRetryableError } from '@/sync/sessionSync';
 import { Field } from '@/components/Field';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { SegmentedField } from '@/components/SegmentedField';
@@ -94,6 +96,7 @@ export default function ActiveSessionScreen() {
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [restored, setRestored] = useState(false);
+  const [clientRequestId, setClientRequestId] = useState(() => newClientRequestId());
   const elapsedSeconds = secondsBetween(new Date(startedAt).getTime(), now);
   const restRemaining = secondsUntil(restEndsAt, now);
   const [loading, setLoading] = useState(Boolean(id));
@@ -111,10 +114,10 @@ export default function ActiveSessionScreen() {
       return;
     }
     const timer = setTimeout(() => {
-      saveWorkoutDraft({ version: 1, routineId: id, startedAt, timezone, restEndsAt, rows, savedAt: Date.now() }).catch(() => undefined);
+      saveWorkoutDraft({ version: 1, routineId: id, startedAt, timezone, restEndsAt, rows, savedAt: Date.now(), clientRequestId }).catch(() => undefined);
     }, 400);
     return () => clearTimeout(timer);
-  }, [draftReady, id, rows, startedAt, timezone, restEndsAt]);
+  }, [draftReady, id, rows, startedAt, timezone, restEndsAt, clientRequestId]);
 
   useEffect(() => {
     const hasCompletedRows = rows.some((row) => row.completed);
@@ -152,6 +155,9 @@ export default function ActiveSessionScreen() {
           setStartedAt(draft.startedAt);
           setTimezone(draft.timezone);
           setRestEndsAt(draft.restEndsAt);
+          if (draft.clientRequestId) {
+            setClientRequestId(draft.clientRequestId);
+          }
           setRestored(true);
         } else {
           setRows(buildRowsFromRoutine(routineItem));
@@ -244,18 +250,27 @@ export default function ActiveSessionScreen() {
 
     setSaving(true);
     setError(null);
+    const payload = {
+      client_request_id: clientRequestId,
+      routine_id: id,
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      timezone,
+      notes: `Sesión guiada desde rutina: ${routine.name}`,
+      sets: result.sets,
+    };
     try {
-      await createWorkoutSession({
-        routine_id: id,
-        started_at: startedAt,
-        finished_at: new Date().toISOString(),
-        timezone,
-        notes: `Sesión guiada desde rutina: ${routine.name}`,
-        sets: result.sets,
-      });
+      await createWorkoutSession(payload);
       await clearWorkoutDraft();
       router.replace('/sessions?notice=created');
     } catch (caught) {
+      if (isRetryableError(caught)) {
+        // Sin conexion (habitual en el gimnasio): se guarda en el movil y se envia sola despues.
+        await enqueueSession(payload, `${routine.name} · ${new Date(startedAt).toLocaleDateString()}`);
+        await clearWorkoutDraft();
+        router.replace('/sessions?notice=queued');
+        return;
+      }
       setError(caught instanceof Error ? caught.message : 'No se pudo finalizar la sesión.');
     } finally {
       setSaving(false);

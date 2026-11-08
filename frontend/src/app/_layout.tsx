@@ -14,8 +14,35 @@ import {
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 
 import { zenith } from '@/constants/zenithTheme';
+import { initSentry } from '@/observability/sentry';
+import { syncPendingSessions } from '@/sync/sessionSync';
+
+initSentry();
+
+const SYNC_INTERVAL_MS = 60_000;
+
+function usePendingSessionSync() {
+  useEffect(() => {
+    const run = () => {
+      syncPendingSessions().catch(() => undefined);
+    };
+    run();
+    const timer = setInterval(run, SYNC_INTERVAL_MS);
+    const hasWindowEvents = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
+    if (hasWindowEvents) {
+      window.addEventListener('online', run);
+    }
+    return () => {
+      clearInterval(timer);
+      if (hasWindowEvents) {
+        window.removeEventListener('online', run);
+      }
+    };
+  }, []);
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -27,6 +54,8 @@ export default function RootLayout() {
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
   });
+
+  usePendingSessionSync();
 
   if (!fontsLoaded) {
     return null;
@@ -55,6 +84,9 @@ export default function RootLayout() {
       <Stack.Screen name="stats" options={{ headerShown: false, title: 'Estadísticas' }} />
       <Stack.Screen name="coach" options={{ headerShown: false, title: 'Entrenador IA' }} />
       <Stack.Screen name="account" options={{ title: 'Cuenta' }} />
+      <Stack.Screen name="forgot-password" options={{ title: 'Recuperar contraseña' }} />
+      <Stack.Screen name="reset-password" options={{ title: 'Nueva contraseña' }} />
+      <Stack.Screen name="verify-email" options={{ title: 'Verificar email' }} />
       <Stack.Screen name="privacy" options={{ title: 'Privacidad' }} />
       <Stack.Screen name="terms" options={{ title: 'Términos' }} />
     </Stack>

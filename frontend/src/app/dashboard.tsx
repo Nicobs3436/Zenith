@@ -3,7 +3,7 @@ import { Activity, ChevronRight, Flame, Play, Sparkles, TrendingUp, Trophy, Zap 
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AuthExpiredError, Exercise, ExerciseStats, getExercises, getExerciseStats, getMe, getRank, getRoutines, getWorkoutSessions, logout, RankProgress, Routine, User, WorkoutSession } from '@/api/client';
+import { AuthExpiredError, Exercise, ExerciseStats, getExercises, getExerciseStats, getMe, getRank, getRoutines, getWorkoutSessions, logout, RankProgress, resendVerificationEmail, Routine, User, WorkoutSession } from '@/api/client';
 import { ZenithBottomNav, ZenithButton, ZenithCard, ZenithNotice, ZenithPill, ZenithStatCard, zenithText } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { routineAccents, zenith } from '@/constants/zenithTheme';
@@ -21,6 +21,7 @@ export default function DashboardScreen() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -56,6 +57,15 @@ export default function DashboardScreen() {
     };
   }, [router]);
 
+  async function submitResendVerification() {
+    try {
+      await resendVerificationEmail();
+      setVerificationNotice('Te hemos enviado un nuevo enlace. Revisa también la carpeta de spam.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo reenviar el email.');
+    }
+  }
+
   async function submitLogout() {
     await logout();
     router.replace('/login');
@@ -82,6 +92,13 @@ export default function DashboardScreen() {
         </View>
       </View>
 
+      {user && user.email_verified === false && (
+        <ZenithCard style={styles.verifyCard}>
+          <Text style={styles.verifyText}>Confirma tu email para poder recuperar la cuenta si olvidas la contraseña.</Text>
+          {verificationNotice && <ZenithNotice tone="success">{verificationNotice}</ZenithNotice>}
+          <ZenithButton onPress={submitResendVerification} title="Reenviar email de verificación" variant="secondary" />
+        </ZenithCard>
+      )}
       {loading && <ZenithNotice>Cargando tu base de entrenamiento...</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
 
@@ -170,6 +187,8 @@ function formatCompactVolume(value: number) {
 }
 
 const styles = StyleSheet.create({
+  verifyCard: { borderColor: zenith.colors.amber, gap: 10 },
+  verifyText: { color: zenith.colors.foreground, fontFamily: zenith.font.body, fontSize: 15, lineHeight: 21 },
   heroHeader: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   heroTitleBlock: { flex: 1, gap: 2 },
   date: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase' },

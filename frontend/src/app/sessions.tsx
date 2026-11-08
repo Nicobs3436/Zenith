@@ -1,9 +1,10 @@
 import { Link, useLocalSearchParams } from 'expo-router';
 import { Plus } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { deleteWorkoutSession, Exercise, getExercises, getRoutines, getWorkoutSessions, Routine, WorkoutSession } from '@/api/client';
+import { PendingSessionsCard } from '@/components/PendingSessionsCard';
 import { ZenithCard, ZenithHeader, ZenithIconButton, ZenithNotice, ZenithPill } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { routineAccents, zenith } from '@/constants/zenithTheme';
@@ -20,9 +21,10 @@ export default function SessionsScreen() {
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     Promise.all([getWorkoutSessions(), getRoutines(), getExercises()])
       .then(([sessionItems, routineItems, exerciseItems]) => {
+        setError(null);
         setSessions(sessionItems);
         setRoutines(routineItems);
         setExercises(exerciseItems);
@@ -31,7 +33,11 @@ export default function SessionsScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  const noticeText = notice === 'created' ? 'Sesión registrada.' : notice === 'updated' ? 'Sesión guardada.' : notice === 'deleted' ? 'Sesión eliminada.' : null;
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const noticeText = notice === 'created' ? 'Sesión registrada.' : notice === 'updated' ? 'Sesión guardada.' : notice === 'deleted' ? 'Sesión eliminada.' : notice === 'queued' ? 'Sin conexión: la sesión está guardada en el móvil y se enviará sola.' : null;
 
   async function submitDeleteSession(sessionId: string) {
     if (deleteConfirm !== sessionId) {
@@ -58,7 +64,8 @@ export default function SessionsScreen() {
   return (
     <ZenithScreen>
       <ZenithHeader title="Sesiones" subtitle="Entrenamiento" right={<ZenithIconButton href="/session-new" label="Registrar sesión manual"><Plus color={zenith.colors.primary} size={17} /></ZenithIconButton>} />
-      {noticeText && <ZenithNotice tone="success">{noticeText}</ZenithNotice>}
+      {noticeText && <ZenithNotice tone={notice === 'queued' ? 'warning' : 'success'}>{noticeText}</ZenithNotice>}
+      <PendingSessionsCard onSynced={loadData} />
       {actionNotice && <ZenithNotice tone="success">{actionNotice}</ZenithNotice>}
       {loading && <ZenithNotice>Cargando rutinas y sesiones...</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}

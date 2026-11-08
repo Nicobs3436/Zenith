@@ -48,21 +48,25 @@ describe('tokenStorage', () => {
     installLocalStorage();
   });
 
-  it('stores, loads and clears access and refresh tokens on web', async () => {
+  it('keeps the access token only in memory on web and never stores a refresh token', async () => {
+    const legacy = installLocalStorage();
+    legacy.setItem('gym_ai_refresh_token', 'legacy-refresh');
     const storage = await import('./tokenStorage');
 
     await storage.setAuthTokens({ accessToken: 'access-token', refreshToken: 'refresh-token' });
 
     expect(await storage.getAccessToken()).toBe('access-token');
-    expect(await storage.getRefreshToken()).toBe('refresh-token');
+    expect(await storage.getRefreshToken()).toBeNull();
+    expect(legacy.getItem('gym_ai_refresh_token')).toBeNull();
+    expect(legacy.setItem).toHaveBeenCalledTimes(1);
 
     const reloadedStorage = await import('./tokenStorage');
-    expect(await reloadedStorage.loadAuthTokens()).toEqual({ accessToken: 'access-token', refreshToken: 'refresh-token' });
+    vi.resetModules();
+    const freshStorage = await import('./tokenStorage');
+    expect(await freshStorage.loadAuthTokens()).toEqual({ accessToken: null, refreshToken: null });
 
     await reloadedStorage.clearAuthTokens();
-
     expect(await reloadedStorage.getAccessToken()).toBeNull();
-    expect(await reloadedStorage.getRefreshToken()).toBeNull();
   });
 
   it('stores, loads and clears access and refresh tokens with SecureStore on native', async () => {

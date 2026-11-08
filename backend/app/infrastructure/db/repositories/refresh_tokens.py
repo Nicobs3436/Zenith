@@ -33,6 +33,14 @@ class RefreshTokenRepository:
     def get_by_hash(self, token_hash: str) -> RefreshToken | None:
         return self.db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
 
+    def revoke_all_for_user(self, user_id: UUID) -> None:
+        now = datetime.now(UTC)
+        for token in self.db.scalars(
+            select(RefreshToken).where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
+        ).all():
+            token.revoked_at = now
+        self.db.flush()
+
     def revoke(self, token: RefreshToken) -> RefreshToken:
         token.revoked_at = datetime.now(UTC)
         self.db.add(token)

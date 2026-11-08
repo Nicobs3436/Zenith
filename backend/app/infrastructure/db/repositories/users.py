@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -21,7 +22,14 @@ class UserRepository:
         return self.db.scalar(select(User).where(User.username == username))
 
     def create(self, *, email: str, username: str, password_hash: str) -> User:
-        user = User(email=email, username=username, password_hash=password_hash)
+        now = datetime.now(UTC)
+        user = User(
+            email=email,
+            username=username,
+            password_hash=password_hash,
+            terms_accepted_at=now,
+            adult_confirmed_at=now,
+        )
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)

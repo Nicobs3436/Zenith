@@ -35,6 +35,10 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - Frontend persiste access y refresh token con `expo-secure-store`; fallback web actual usa `localStorage`.
 - Pendiente backend: typecheck (mypy/pyright) todavia no esta configurado.
 - Deploy fase 20: coste 0 con Render Free para backend Docker, Neon Free para PostgreSQL, Vercel Free para web/PWA, GitHub Actions Free para CI e IA `groq` en staging/produccion para Coach V3 con clave en secreto.
+- Presupuesto 0 EUR siempre: solo planes gratuitos; sin dominio propio; ver `docs/production-checklist.md`.
+- Auth: verificacion de email y recuperacion de contrasena con tokens de un uso (`email_tokens`, solo hash); email por `APP_EMAIL_PROVIDER` (console/smtp/resend). Registro exige `accepted_terms` y `adult_confirmed` (edad minima 18).
+- Web: refresh token en cookie httpOnly; la web llama a `/api` (proxy de Vercel) con cabecera `X-Zenith-Client: web`; movil usa SecureStore.
+- Sesiones: `client_request_id` hace idempotente `POST /workout-sessions`; la app encola sesiones terminadas sin red (`src/storage/sessionOutbox.ts`) y las reenvia.
 - Producto fase 21: beta gratuita Zenith con branding, privacidad/terminos estaticos, aviso medico visible y aceptacion antes de registro; exportacion JSON (`GET /users/me/export`) y eliminacion permanente con contrasena (`DELETE /users/me`) desde la pantalla Cuenta.
 - Sesion activa: borrador local troceado en `expo-secure-store` (web: `localStorage`) para recuperarla si se cierra la app; se borra al finalizar/cancelar o tras 24 h.
 

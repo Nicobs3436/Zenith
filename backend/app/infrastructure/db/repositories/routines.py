@@ -105,6 +105,14 @@ class WorkoutSessionRepository:
         )
         return self.db.scalar(statement)
 
+    def get_by_client_request(self, user_id: UUID, client_request_id: UUID) -> WorkoutSession | None:
+        statement = (
+            select(WorkoutSession)
+            .options(selectinload(WorkoutSession.sets))
+            .where(WorkoutSession.user_id == user_id, WorkoutSession.client_request_id == client_request_id)
+        )
+        return self.db.scalar(statement)
+
     def create(
         self,
         *,
@@ -114,8 +122,10 @@ class WorkoutSessionRepository:
         finished_at,
         timezone: str,
         notes: str | None,
+        client_request_id: UUID | None = None,
     ) -> WorkoutSession:
         session = WorkoutSession(
+            client_request_id=client_request_id,
             user_id=user_id,
             routine_id=routine_id,
             started_at=started_at,

@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.application.email_service import OutgoingEmail, password_reset_email, verification_email
 from app.core.config import get_settings
 from app.core.security import (
     create_access_token,
@@ -16,8 +17,13 @@ from app.core.security import (
 )
 from app.domain.users import UserCreate
 from app.infrastructure.db.models.user import User
+from app.infrastructure.db.repositories.email_tokens import EmailTokenRepository
 from app.infrastructure.db.repositories.refresh_tokens import RefreshTokenRepository
 from app.infrastructure.db.repositories.users import UserRepository
+
+EMAIL_VERIFICATION = "verify_email"
+PASSWORD_RESET = "reset_password"
+EMAIL_TOKEN_TTL = {EMAIL_VERIFICATION: timedelta(hours=48), PASSWORD_RESET: timedelta(hours=1)}
 
 
 class DuplicateUserError(Exception):
@@ -25,6 +31,10 @@ class DuplicateUserError(Exception):
 
 
 class InvalidRefreshTokenError(Exception):
+    pass
+
+
+class InvalidEmailTokenError(Exception):
     pass
 
 
@@ -101,6 +111,61 @@ class AuthService:
         persisted = RefreshTokenRepository(db).get_by_hash(hash_refresh_token(refresh_token))
         if persisted is not None and persisted.revoked_at is None:
             RefreshTokenRepository(db).revoke(persisted)
+
+    def _issue_email_token(self, db: Session, user: User, purpose: str, path: str) -> str:
+        token = create_refresh_token()
+        EmailTokenRepository(db).create(
+            user_id=user.id,
+            purpose=purpose,
+            token_hash=hash_refresh_token(token),
+            expires_at=datetime.now(UTC) + EMAIL_TOKEN_TTL[purpose],
+        )
+        base_url = get_settings().frontend_base_url.rstrip("/")
+        return f"{base_url}{path}?token={token}"
+
+    def build_verification_email(self, db: Session, user: User) -> OutgoingEmail | None:
+        if user.email_verified_at is not None:
+            return None
+        link = self._issue_email_token(db, user, EMAIL_VERIFICATION, "/verify-email")
+        return verification_email(user.email, link)
+
+    def build_password_reset_email(self, db: Session, email: str) -> OutgoingEmail | None:
+        # Si el email no existe no se envia nada, pero la API responde igual (sin enumerar usuarios).
+        user = UserRepository(db).get_by_email(email)
+        if user is None or not user.is_active:
+            return None
+        link = self._issue_email_token(db, user, PASSWORD_RESET, "/reset-password")
+        return password_reset_email(user.email, link)
+
+    def verify_email(self, db: Session, token: str) -> None:
+        repository = EmailTokenRepository(db)
+        email_token = repository.get_active(token_hash=hash_refresh_token(token), purpose=EMAIL_VERIFICATION)
+        if email_token is None:
+            raise InvalidEmailTokenError
+        user = UserRepository(db).get_by_id(email_token.user_id)
+        if user is None:
+            raise InvalidEmailTokenError
+        now = datetime.now(UTC)
+        email_token.used_at = now
+        user.email_verified_at = user.email_verified_at or now
+        db.commit()
+
+    def reset_password(self, db: Session, token: str, new_password: str) -> None:
+        repository = EmailTokenRepository(db)
+        email_token = repository.get_active(token_hash=hash_refresh_token(token), purpose=PASSWORD_RESET)
+        if email_token is None:
+            raise InvalidEmailTokenError
+        user = UserRepository(db).get_by_id(email_token.user_id)
+        if user is None or not user.is_active:
+            raise InvalidEmailTokenError
+        now = datetime.now(UTC)
+        email_token.used_at = now
+        user.password_hash = hash_password(new_password)
+        # Quien abre el enlace demuestra que controla el email.
+        user.email_verified_at = user.email_verified_at or now
+        # Cierra todas las sesiones abiertas: si alguien tenia acceso, lo pierde.
+        RefreshTokenRepository(db).revoke_all_for_user(user.id)
+        db.commit()
 
     def get_user_from_token(self, db: Session, token: str) -> User | None:
         subject = decode_access_token(token)
