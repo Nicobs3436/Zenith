@@ -213,7 +213,9 @@ class InternalAiProvider:
             external_data_sent=self.external_data_sent,
         )
 
-    def build_coach_evidence_queries(self, context: CoachEvidenceQueryProviderContext) -> CoachEvidenceQueryProviderResult:
+    def build_coach_evidence_queries(
+        self, context: CoachEvidenceQueryProviderContext
+    ) -> CoachEvidenceQueryProviderResult:
         return CoachEvidenceQueryProviderResult(
             evidence_queries=self._default_evidence_queries(context.goal),
             rationale=["Consultas base internas para hipertrofia, fuerza y recuperacion."],
@@ -225,7 +227,13 @@ class InternalAiProvider:
     def _confidence_for(self, suggestion_type: str) -> str:
         if suggestion_type in {"increase_weight", "increase_rest"}:
             return "high"
-        if suggestion_type in {"reduce_volume", "change_reps", "deload_recommended", "exercise_swap", "routine_goal_adjustment"}:
+        if suggestion_type in {
+            "reduce_volume",
+            "change_reps",
+            "deload_recommended",
+            "exercise_swap",
+            "routine_goal_adjustment",
+        }:
             return "medium"
         return "low"
 
@@ -306,7 +314,9 @@ class OllamaAiProvider:
 
         return self._parse_training_plan_response(model_response)
 
-    def build_training_plan_structure(self, context: AiTrainingPlanProviderContext) -> AiTrainingPlanStructureProviderResult:
+    def build_training_plan_structure(
+        self, context: AiTrainingPlanProviderContext
+    ) -> AiTrainingPlanStructureProviderResult:
         payload = {
             "model": self.model,
             "stream": False,
@@ -387,7 +397,9 @@ class OllamaAiProvider:
 
         return self._parse_coach_interview_response(model_response)
 
-    def build_coach_evidence_queries(self, context: CoachEvidenceQueryProviderContext) -> CoachEvidenceQueryProviderResult:
+    def build_coach_evidence_queries(
+        self, context: CoachEvidenceQueryProviderContext
+    ) -> CoachEvidenceQueryProviderResult:
         payload = {
             "model": self.model,
             "stream": False,
@@ -761,19 +773,33 @@ class GroqAiProvider(OllamaAiProvider):
         return self._parse_model_response(self._chat_json(self._prompt(context), max_tokens=GROQ_TEXT_MAX_TOKENS))
 
     def build_training_plan_text(self, context: AiTrainingPlanProviderContext) -> AiTrainingPlanProviderResult:
-        return self._parse_training_plan_response(self._chat_json(self._training_plan_prompt(context), max_tokens=GROQ_TEXT_MAX_TOKENS))
+        return self._parse_training_plan_response(
+            self._chat_json(self._training_plan_prompt(context), max_tokens=GROQ_TEXT_MAX_TOKENS)
+        )
 
-    def build_training_plan_structure(self, context: AiTrainingPlanProviderContext) -> AiTrainingPlanStructureProviderResult:
-        return self._parse_training_plan_structure_response(self._chat_json(self._training_plan_structure_prompt(context)))
+    def build_training_plan_structure(
+        self, context: AiTrainingPlanProviderContext
+    ) -> AiTrainingPlanStructureProviderResult:
+        return self._parse_training_plan_structure_response(
+            self._chat_json(self._training_plan_structure_prompt(context))
+        )
 
     def build_session_summary_text(self, context: AiSessionSummaryProviderContext) -> AiSessionSummaryProviderResult:
-        return self._parse_session_summary_response(self._chat_json(self._session_summary_prompt(context), max_tokens=GROQ_TEXT_MAX_TOKENS))
+        return self._parse_session_summary_response(
+            self._chat_json(self._session_summary_prompt(context), max_tokens=GROQ_TEXT_MAX_TOKENS)
+        )
 
     def build_coach_interview_response(self, context: CoachInterviewProviderContext) -> CoachInterviewProviderResult:
-        return self._parse_coach_interview_response(self._chat_json(self._coach_interview_prompt(context), max_tokens=GROQ_INTERVIEW_MAX_TOKENS))
+        return self._parse_coach_interview_response(
+            self._chat_json(self._coach_interview_prompt(context), max_tokens=GROQ_INTERVIEW_MAX_TOKENS)
+        )
 
-    def build_coach_evidence_queries(self, context: CoachEvidenceQueryProviderContext) -> CoachEvidenceQueryProviderResult:
-        return self._parse_coach_evidence_query_response(self._chat_json(self._coach_evidence_query_prompt(context), max_tokens=GROQ_EVIDENCE_MAX_TOKENS))
+    def build_coach_evidence_queries(
+        self, context: CoachEvidenceQueryProviderContext
+    ) -> CoachEvidenceQueryProviderResult:
+        return self._parse_coach_evidence_query_response(
+            self._chat_json(self._coach_evidence_query_prompt(context), max_tokens=GROQ_EVIDENCE_MAX_TOKENS)
+        )
 
     def _chat_json(self, prompt: str, *, max_tokens: int | None = None) -> Any:
         payload = {

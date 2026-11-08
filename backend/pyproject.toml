@@ -19,8 +19,25 @@ dependencies = [
 dev = [
     "httpx>=0.28.0,<1.0.0",
     "pytest>=8.3.0,<9.0.0",
+    "ruff>=0.8.0,<1.0.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+# E/W: estilo pycodestyle, F: errores (pyflakes), I: orden de imports, B: bugs comunes, UP: sintaxis moderna.
+select = ["E", "W", "F", "I", "B", "UP"]
+# E501: los prompts de IA son cadenas largas a proposito; el formateador ya controla el resto.
+# B008: Depends()/Query() en parametros por defecto es el patron oficial de FastAPI.
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# Los fixtures de pytest importados se "redefinen" como parametros de los tests.
+"tests/*" = ["F811"]

@@ -15,9 +15,7 @@ class RankRepository:
         return list(self.db.scalars(select(Rank).order_by(Rank.sort_order)).all())
 
     def get_rank_for_score(self, score: Decimal) -> Rank:
-        rank = self.db.scalar(
-            select(Rank).where(Rank.min_score <= score).order_by(Rank.min_score.desc()).limit(1)
-        )
+        rank = self.db.scalar(select(Rank).where(Rank.min_score <= score).order_by(Rank.min_score.desc()).limit(1))
         if rank is None:
             rank = self.db.scalar(select(Rank).order_by(Rank.min_score).limit(1))
         if rank is None:
@@ -25,9 +23,7 @@ class RankRepository:
         return rank
 
     def get_next_rank_for_score(self, score: Decimal) -> Rank | None:
-        return self.db.scalar(
-            select(Rank).where(Rank.min_score > score).order_by(Rank.min_score).limit(1)
-        )
+        return self.db.scalar(select(Rank).where(Rank.min_score > score).order_by(Rank.min_score).limit(1))
 
     def save_progress(
         self,

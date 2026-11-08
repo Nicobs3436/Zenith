@@ -1,10 +1,9 @@
+import unicodedata
 from datetime import datetime
 from typing import Any, Literal
-import unicodedata
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
-from pydantic import Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 AiSuggestionType = Literal[
     "increase_weight",

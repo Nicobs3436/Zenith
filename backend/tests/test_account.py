@@ -42,6 +42,7 @@ def client_with_db() -> Generator[tuple[TestClient, SessionFactory], None, None]
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
 
+
 PASSWORD = "password123"
 
 
@@ -59,13 +60,23 @@ def populate(client: TestClient, token: str, global_exercise_id: str) -> None:
             "started_at": datetime(2026, 7, 2, 10, 0, tzinfo=UTC).isoformat(),
             "timezone": "Europe/Madrid",
             "sets": [
-                {"exercise_id": global_exercise_id, "set_number": 1, "reps": 5, "weight_value": "100", "weight_unit": "kg"},
+                {
+                    "exercise_id": global_exercise_id,
+                    "set_number": 1,
+                    "reps": 5,
+                    "weight_value": "100",
+                    "weight_unit": "kg",
+                },
                 {"exercise_id": private_id, "set_number": 2, "reps": 8},
             ],
         },
     )
     assert response.status_code == 201
-    coach = client.post("/ai/coach/messages", headers=headers, json={"message": "Quiero ganar fuerza", "personal_data_acknowledged": True})
+    coach = client.post(
+        "/ai/coach/messages",
+        headers=headers,
+        json={"message": "Quiero ganar fuerza", "personal_data_acknowledged": True},
+    )
     assert coach.status_code == 200
 
 

@@ -56,7 +56,9 @@ class AiTrainingPlanRepository:
         return plan
 
     def list_by_user(self, user_id: UUID) -> list[AiTrainingPlan]:
-        statement = select(AiTrainingPlan).where(AiTrainingPlan.user_id == user_id).order_by(AiTrainingPlan.created_at.desc())
+        statement = (
+            select(AiTrainingPlan).where(AiTrainingPlan.user_id == user_id).order_by(AiTrainingPlan.created_at.desc())
+        )
         return list(self.db.scalars(statement).all())
 
     def get_by_user(self, plan_id: UUID, user_id: UUID, *, for_update: bool = False) -> AiTrainingPlan | None:

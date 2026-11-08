@@ -61,7 +61,9 @@ def delete_current_user(
             window_seconds=settings.auth_login_rate_limit_window_seconds,
         )
     except RateLimitExceededError as error:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many attempts. Try again later.") from error
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many attempts. Try again later."
+        ) from error
     try:
         account_service.delete_account(db, current_user, data.password)
     except InvalidPasswordError as error:

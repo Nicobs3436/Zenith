@@ -1,6 +1,5 @@
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
-from typing import TypeAlias
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +12,7 @@ from app.infrastructure.db.models.exercise import Exercise
 from app.infrastructure.db.session import get_db
 from app.main import app
 
-SessionFactory: TypeAlias = Callable[[], Session]
+type SessionFactory = Callable[[], Session]
 
 
 @pytest.fixture()
@@ -366,8 +365,20 @@ def test_update_workout_session_replaces_sets(client_with_db: tuple[TestClient, 
             "timezone": "Europe/Madrid",
             "notes": "Updated session",
             "sets": [
-                {"exercise_id": str(second_exercise.id), "set_number": 1, "reps": 8, "weight_value": "60", "weight_unit": "kg"},
-                {"exercise_id": str(second_exercise.id), "set_number": 2, "reps": 7, "weight_value": "60", "weight_unit": "kg"},
+                {
+                    "exercise_id": str(second_exercise.id),
+                    "set_number": 1,
+                    "reps": 8,
+                    "weight_value": "60",
+                    "weight_unit": "kg",
+                },
+                {
+                    "exercise_id": str(second_exercise.id),
+                    "set_number": 2,
+                    "reps": 7,
+                    "weight_value": "60",
+                    "weight_unit": "kg",
+                },
             ],
         },
     )
@@ -518,7 +529,9 @@ def test_delete_workout_session_hides_it(client_with_db: tuple[TestClient, Sessi
 
     assert response.status_code == 204
     assert client.get("/workout-sessions", headers={"Authorization": f"Bearer {token}"}).json() == []
-    assert client.get(f"/workout-sessions/{session_id}", headers={"Authorization": f"Bearer {token}"}).status_code == 404
+    assert (
+        client.get(f"/workout-sessions/{session_id}", headers={"Authorization": f"Bearer {token}"}).status_code == 404
+    )
 
 
 def test_delete_workout_session_returns_404_for_another_users_session(

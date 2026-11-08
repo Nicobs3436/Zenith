@@ -1,5 +1,4 @@
 from collections.abc import Callable, Generator
-from typing import TypeAlias
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,7 +11,7 @@ from app.infrastructure.db.models.exercise import Equipment, Exercise, MuscleGro
 from app.infrastructure.db.session import get_db
 from app.main import app
 
-SessionFactory: TypeAlias = Callable[[], Session]
+type SessionFactory = Callable[[], Session]
 
 
 @pytest.fixture()

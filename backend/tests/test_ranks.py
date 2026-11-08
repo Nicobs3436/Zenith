@@ -1,6 +1,6 @@
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime, timedelta
-from typing import Any, TypeAlias
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,7 +15,7 @@ from app.infrastructure.db.seed import seed_database
 from app.infrastructure.db.session import get_db
 from app.main import app
 
-SessionFactory: TypeAlias = Callable[[], Session]
+type SessionFactory = Callable[[], Session]
 
 
 @pytest.fixture()

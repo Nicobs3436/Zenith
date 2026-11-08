@@ -1,6 +1,6 @@
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
-from typing import Any, TypeAlias
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +13,7 @@ from app.infrastructure.db.models.exercise import Exercise, MuscleGroup
 from app.infrastructure.db.session import get_db
 from app.main import app
 
-SessionFactory: TypeAlias = Callable[[], Session]
+type SessionFactory = Callable[[], Session]
 
 
 @pytest.fixture()
@@ -380,9 +380,27 @@ def test_stats_overview_returns_kpis_volume_muscles_and_top_exercises(
         {"name": "Espalda", "total_sets": 1},
     ]
     assert data["volume_points"] == [
-        {"period_start": "2026-07-06T00:00:00Z", "weight_unit": "kg", "total_volume": "800.00", "total_sets": 2, "session_count": 1},
-        {"period_start": "2026-07-13T00:00:00Z", "weight_unit": "kg", "total_volume": "640.00", "total_sets": 1, "session_count": 1},
-        {"period_start": "2026-07-13T00:00:00Z", "weight_unit": "lb", "total_volume": "1000.00", "total_sets": 1, "session_count": 1},
+        {
+            "period_start": "2026-07-06T00:00:00Z",
+            "weight_unit": "kg",
+            "total_volume": "800.00",
+            "total_sets": 2,
+            "session_count": 1,
+        },
+        {
+            "period_start": "2026-07-13T00:00:00Z",
+            "weight_unit": "kg",
+            "total_volume": "640.00",
+            "total_sets": 1,
+            "session_count": 1,
+        },
+        {
+            "period_start": "2026-07-13T00:00:00Z",
+            "weight_unit": "lb",
+            "total_volume": "1000.00",
+            "total_sets": 1,
+            "session_count": 1,
+        },
     ]
     assert data["top_exercises"][0]["exercise_name"] == "Barbell row"
     assert data["top_exercises"][0]["best_estimated_1rm"] == "101.33"

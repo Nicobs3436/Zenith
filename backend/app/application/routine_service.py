@@ -2,8 +2,8 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.domain.routines import RoutineCreate, WorkoutSessionCreate
 from app.application.rank_service import rank_service
+from app.domain.routines import RoutineCreate, WorkoutSessionCreate
 from app.infrastructure.db.models.routine import Routine
 from app.infrastructure.db.models.user import User
 from app.infrastructure.db.models.workout import WorkoutSession

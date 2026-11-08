@@ -6,7 +6,12 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.application.ai_provider import AiProviderError, CoachEvidenceQueryProviderContext, CoachInterviewProviderContext, build_ai_provider
+from app.application.ai_provider import (
+    AiProviderError,
+    CoachEvidenceQueryProviderContext,
+    CoachInterviewProviderContext,
+    build_ai_provider,
+)
 from app.application.ai_training_plan_service import (
     AiTrainingPlanCannotGenerateError,
     AiTrainingPlanNotDraftError,
@@ -136,7 +141,9 @@ class CoachService:
             state["ready_for_plan"] = bool(result.ready_for_plan)
         state["missing_useful"] = self._merge_unique(result.missing_useful, self._missing_useful(profile, state))[:20]
 
-        conversation.recent_messages = self._recent_messages(conversation.recent_messages, data.message, result.assistant_message)
+        conversation.recent_messages = self._recent_messages(
+            conversation.recent_messages, data.message, result.assistant_message
+        )
         conversation.conversation_summary = json.dumps(state, ensure_ascii=False)
         conversation.phase = self._phase(db, user.id, profile, state)
         profile.memory_summary = self._memory_summary(profile, state)
@@ -224,14 +231,20 @@ class CoachService:
         db.commit()
         return plan
 
-    def revise_plan_draft(self, db: Session, plan_id: UUID, user: User, data: CoachPlanDraftReviseRequest) -> AiTrainingPlan:
+    def revise_plan_draft(
+        self, db: Session, plan_id: UUID, user: User, data: CoachPlanDraftReviseRequest
+    ) -> AiTrainingPlan:
         original = self._get_coach_plan(db, plan_id, user.id)
         repository = CoachRepository(db)
         profile = repository.get_or_create_profile(user.id)
         conversation = repository.get_or_create_conversation(user.id)
         state = self._load_interview_state(conversation)
         needs_evidence = self._revision_needs_evidence(data.instruction)
-        evidence = self._collect_evidence(profile, state, revision_requested=True) if needs_evidence else dict(original.plan_payload.get("evidence") or {})
+        evidence = (
+            self._collect_evidence(profile, state, revision_requested=True)
+            if needs_evidence
+            else dict(original.plan_payload.get("evidence") or {})
+        )
         try:
             plan = ai_training_plan_service.modify_plan(
                 db,
@@ -257,7 +270,12 @@ class CoachService:
         }
         if evidence:
             plan.input_summary["evidence"] = evidence
-        plan.plan_payload = {**dict(plan.plan_payload or {}), "source": PLAN_CREATED_BY, "schema_version": 1, "evidence": evidence}
+        plan.plan_payload = {
+            **dict(plan.plan_payload or {}),
+            "source": PLAN_CREATED_BY,
+            "schema_version": 1,
+            "evidence": evidence,
+        }
         db.commit()
         return plan
 
@@ -339,7 +357,10 @@ class CoachService:
         return plan
 
     def _is_coach_plan(self, plan: AiTrainingPlan) -> bool:
-        return plan.input_summary.get("created_by") == PLAN_CREATED_BY or plan.plan_payload.get("source") == PLAN_CREATED_BY
+        return (
+            plan.input_summary.get("created_by") == PLAN_CREATED_BY
+            or plan.plan_payload.get("source") == PLAN_CREATED_BY
+        )
 
     def _mark_coach_plan(self, plan: AiTrainingPlan, state: dict[str, Any], evidence: dict[str, Any]) -> None:
         plan.input_summary = {
@@ -360,7 +381,9 @@ class CoachService:
             },
         }
 
-    def _apply_profile_updates(self, profile: CoachProfile, state: dict[str, Any], updates: dict[str, Any]) -> list[str]:
+    def _apply_profile_updates(
+        self, profile: CoachProfile, state: dict[str, Any], updates: dict[str, Any]
+    ) -> list[str]:
         changed: list[str] = []
         for field, value in updates.items():
             cleaned = self._clean_update(field, value, profile)
@@ -385,9 +408,14 @@ class CoachService:
             strength_markers = ["ganar fuerza", "mas fuerza", "entrenamiento de fuerza", "powerlifting"]
             if any(marker in text for marker in strength_markers) or re.search(r"\bfuerza\b", text):
                 updates["goal"] = "strength"
-            elif any(marker in text for marker in ["hipertrofia", "ganar musculo", "masa muscular", "ponerme grande", "musculo"]):
+            elif any(
+                marker in text
+                for marker in ["hipertrofia", "ganar musculo", "masa muscular", "ponerme grande", "musculo"]
+            ):
                 updates["goal"] = "hypertrophy"
-            elif any(marker in text for marker in ["perder grasa", "bajar peso", "adelgazar", "definir", "perdida de grasa"]):
+            elif any(
+                marker in text for marker in ["perder grasa", "bajar peso", "adelgazar", "definir", "perdida de grasa"]
+            ):
                 updates["goal"] = "fat_loss"
             elif "salud" in text:
                 updates["goal"] = "general_health"
@@ -471,9 +499,32 @@ class CoachService:
             return value if isinstance(value, int) and 1 <= value <= 7 else _SKIP
         if field == "session_duration_minutes":
             return value if isinstance(value, int) and 20 <= value <= 180 else _SKIP
-        if field in {"equipment", "priorities", "preferred_exercises", "avoided_exercises", "available_weekdays", "main_lifts", "lagging_muscles", "well_developed_muscles", "weeks_with_limited_training"}:
+        if field in {
+            "equipment",
+            "priorities",
+            "preferred_exercises",
+            "avoided_exercises",
+            "available_weekdays",
+            "main_lifts",
+            "lagging_muscles",
+            "well_developed_muscles",
+            "weeks_with_limited_training",
+        }:
             return self._clean_list(value)
-        if field in {"sleep_quality", "stress_level", "current_fatigue", "training_location", "current_routine", "recent_results", "nutrition_current", "willing_to_track_nutrition", "timeline_goal", "tracking_method", "body_fat_percent", "physical_limitations"}:
+        if field in {
+            "sleep_quality",
+            "stress_level",
+            "current_fatigue",
+            "training_location",
+            "current_routine",
+            "recent_results",
+            "nutrition_current",
+            "willing_to_track_nutrition",
+            "timeline_goal",
+            "tracking_method",
+            "body_fat_percent",
+            "physical_limitations",
+        }:
             return value.strip()[:1_000] if isinstance(value, str) and value.strip() else _SKIP
         return _SKIP
 
@@ -525,7 +576,9 @@ class CoachService:
         updated["known_facts"] = self._merge_unique(self._string_list_state(state, "known_facts"), result.known_facts)
         updated["missing_critical"] = result.missing_critical
         updated["missing_useful"] = result.missing_useful
-        updated["estimated_fields"] = self._merge_unique(self._string_list_state(state, "estimated_fields"), result.estimated_fields)
+        updated["estimated_fields"] = self._merge_unique(
+            self._string_list_state(state, "estimated_fields"), result.estimated_fields
+        )
         updated["misunderstanding_corrections"] = result.misunderstanding_corrections
         updated["safety_flags"] = result.safety_flags
         updated["ready_for_plan"] = result.ready_for_plan
@@ -569,8 +622,14 @@ class CoachService:
             return "Tengo los datos imprescindibles. Puedo generar una vista previa del plan y luego la ajustamos antes de crear rutinas."
         return "Tengo muchos datos. Si quieres, seguimos afinando preferencias, molestias, sueño, nutricion y seguimiento antes de generar la vista previa."
 
-    def _recent_messages(self, current: list[dict[str, str]], user_message: str, assistant_message: str) -> list[dict[str, str]]:
-        messages = [*(current or []), {"role": "user", "content": user_message}, {"role": "assistant", "content": assistant_message}]
+    def _recent_messages(
+        self, current: list[dict[str, str]], user_message: str, assistant_message: str
+    ) -> list[dict[str, str]]:
+        messages = [
+            *(current or []),
+            {"role": "user", "content": user_message},
+            {"role": "assistant", "content": assistant_message},
+        ]
         return messages[-16:]
 
     def _memory_summary(self, profile: CoachProfile, state: dict[str, Any]) -> str:
@@ -590,7 +649,9 @@ class CoachService:
         priorities.extend([f"datos utiles: {item}" for item in self._string_list_state(state, "known_facts")[:6]])
         return priorities[:20]
 
-    def _coach_brief(self, profile: CoachProfile, state: dict[str, Any], *, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _coach_brief(
+        self, profile: CoachProfile, state: dict[str, Any], *, evidence: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         return {
             "created_by": PLAN_CREATED_BY,
             "profile": self._profile_snapshot(profile, state),
@@ -606,9 +667,16 @@ class CoachService:
             ],
         }
 
-    def _collect_evidence(self, profile: CoachProfile, state: dict[str, Any], *, revision_requested: bool) -> dict[str, Any]:
+    def _collect_evidence(
+        self, profile: CoachProfile, state: dict[str, Any], *, revision_requested: bool
+    ) -> dict[str, Any]:
         if revision_requested is False and profile.goal is None:
-            return {"search_queries": [], "used_references": [], "limitations": ["No se busco evidencia porque falta objetivo."], "errors": []}
+            return {
+                "search_queries": [],
+                "used_references": [],
+                "limitations": ["No se busco evidencia porque falta objetivo."],
+                "errors": [],
+            }
         provider = build_ai_provider()
         context = CoachEvidenceQueryProviderContext(
             goal=profile.goal or "hypertrophy",
@@ -632,14 +700,35 @@ class CoachService:
         return evidence
 
     def _neutral_plan_focus(self, profile: CoachProfile) -> list[str]:
-        focus = [profile.goal or "hypertrophy", "volume", "frequency", "repetitions", "proximity to failure", "rest intervals", "progression", "deload", "protein intake"]
+        focus = [
+            profile.goal or "hypertrophy",
+            "volume",
+            "frequency",
+            "repetitions",
+            "proximity to failure",
+            "rest intervals",
+            "progression",
+            "deload",
+            "protein intake",
+        ]
         if profile.experience_level:
             focus.append(f"{profile.experience_level} trainees")
         return focus[:12]
 
     def _revision_needs_evidence(self, instruction: str) -> bool:
         normalized = instruction.lower()
-        markers = ["evidencia", "cient", "estudio", "referencia", "pubmed", "doi", "pmid", "justifica", "por que", "por qué"]
+        markers = [
+            "evidencia",
+            "cient",
+            "estudio",
+            "referencia",
+            "pubmed",
+            "doi",
+            "pmid",
+            "justifica",
+            "por que",
+            "por qué",
+        ]
         return any(marker in normalized for marker in markers)
 
     def _default_evidence_queries(self, goal: str) -> list[str]:

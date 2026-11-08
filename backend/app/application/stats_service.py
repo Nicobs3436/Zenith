@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -290,11 +290,15 @@ class StatsService:
             workout_set, session, exercise = row
             unit = row_weight_unit(row)
             if workout_set.weight_value is not None:
-                volume_by_unit[unit] = volume_by_unit.get(unit, Decimal("0")) + Decimal(workout_set.weight_value) * workout_set.reps
+                volume_by_unit[unit] = (
+                    volume_by_unit.get(unit, Decimal("0")) + Decimal(workout_set.weight_value) * workout_set.reps
+                )
 
             period_start = period_start_for(session.started_at, period, session.timezone)
             period_key = (period_start, unit)
-            period_groups.setdefault(period_key, StatsOverviewAccumulator(period_start=period_start, weight_unit=unit)).add(row)
+            period_groups.setdefault(
+                period_key, StatsOverviewAccumulator(period_start=period_start, weight_unit=unit)
+            ).add(row)
 
             if exercise.muscle_groups:
                 for muscle_group in exercise.muscle_groups:
@@ -315,7 +319,9 @@ class StatsService:
         if start_date is None and end_date is None:
             history_rows = rows
         else:
-            history_rows = filter_rows_by_weight_unit(StatsRepository(db).list_workout_sets(user_id=user.id), weight_unit)
+            history_rows = filter_rows_by_weight_unit(
+                StatsRepository(db).list_workout_sets(user_id=user.id), weight_unit
+            )
         pr_count = count_personal_records(history_rows, start_date, end_date)
 
         top_exercises = [to_top_exercise(group) for group in exercises.values()]

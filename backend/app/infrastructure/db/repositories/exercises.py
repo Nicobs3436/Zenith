@@ -19,9 +19,7 @@ class ExerciseRepository:
         if user_id is None:
             statement = statement.where(Exercise.is_global.is_(True))
         else:
-            statement = statement.where(
-                or_(Exercise.is_global.is_(True), Exercise.created_by_user_id == user_id)
-            )
+            statement = statement.where(or_(Exercise.is_global.is_(True), Exercise.created_by_user_id == user_id))
         return list(self.db.scalars(statement).all())
 
     def get_accessible(self, exercise_id: UUID, user_id: UUID | None) -> Exercise | None:
@@ -33,9 +31,7 @@ class ExerciseRepository:
         if user_id is None:
             statement = statement.where(Exercise.is_global.is_(True))
         else:
-            statement = statement.where(
-                or_(Exercise.is_global.is_(True), Exercise.created_by_user_id == user_id)
-            )
+            statement = statement.where(or_(Exercise.is_global.is_(True), Exercise.created_by_user_id == user_id))
         return self.db.scalar(statement)
 
     def list_muscle_groups(self) -> list[MuscleGroup]:

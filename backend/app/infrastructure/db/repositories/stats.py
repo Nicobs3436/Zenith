@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session, selectinload
 from app.infrastructure.db.models.exercise import Exercise
 from app.infrastructure.db.models.workout import WorkoutSession, WorkoutSet
 
-
 StatsRow = tuple[WorkoutSet, WorkoutSession, Exercise]
 
 

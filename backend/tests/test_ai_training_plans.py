@@ -1,5 +1,5 @@
-from collections.abc import Callable, Generator
 import json
+from collections.abc import Callable, Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -53,7 +53,9 @@ def register_and_login(client: TestClient, email: str, username: str) -> str:
 def seed_exercises(session_factory: SessionFactory, count: int = 5) -> list[Exercise]:
     db = session_factory()
     try:
-        exercises = [Exercise(name=f"Exercise {index}", difficulty="beginner", is_global=True) for index in range(1, count + 1)]
+        exercises = [
+            Exercise(name=f"Exercise {index}", difficulty="beginner", is_global=True) for index in range(1, count + 1)
+        ]
         db.add_all(exercises)
         db.commit()
         for exercise in exercises:
@@ -77,7 +79,9 @@ def plan_payload(**overrides) -> dict:
     }
 
 
-def ollama_plan_response(exercises: list[Exercise], *, explanation: str = "Plan creado por Ollama", days: int = 3) -> bytes:
+def ollama_plan_response(
+    exercises: list[Exercise], *, explanation: str = "Plan creado por Ollama", days: int = 3
+) -> bytes:
     routines = []
     for day in range(1, days + 1):
         selected = [exercises[(day - 1) % len(exercises)], exercises[day % len(exercises)]]
@@ -313,7 +317,9 @@ def test_groq_provider_generates_training_plan_structure(
     monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
     client, session_factory = client_with_db
     exercises = seed_exercises(session_factory)
-    groq_content = json.loads(ollama_plan_response(exercises, explanation="Plan estructurado por Groq").decode("utf-8"))["response"]
+    groq_content = json.loads(
+        ollama_plan_response(exercises, explanation="Plan estructurado por Groq").decode("utf-8")
+    )["response"]
     response_body = json.dumps({"choices": [{"message": {"content": groq_content}}]}).encode("utf-8")
     token = register_and_login(client, "groq-owner@example.com", "groq_owner")
 
@@ -367,7 +373,10 @@ def test_ollama_provider_falls_back_for_training_plan_on_invalid_response(
     get_settings.cache_clear()
     assert response.status_code == 201
     data = response.json()
-    assert data["explanation"] == "Plan adaptativo de 2 dias para objetivo hypertrophy, nivel beginner y sesiones de 60 minutos."
+    assert (
+        data["explanation"]
+        == "Plan adaptativo de 2 dias para objetivo hypertrophy, nivel beginner y sesiones de 60 minutos."
+    )
     assert data["provider"] == "ollama"
     assert data["fallback_used"] is True
     assert data["input_summary"]["ai_provider"]["fallback_used"] is True
@@ -379,7 +388,9 @@ def test_generate_training_plan_rejects_invalid_internal_payload(
     client, session_factory = client_with_db
     seed_exercises(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
-    monkeypatch.setattr(ai_training_plan_service, "_build_plan_payload", lambda _data, _exercises: {"version": 1, "routines": []})
+    monkeypatch.setattr(
+        ai_training_plan_service, "_build_plan_payload", lambda _data, _exercises: {"version": 1, "routines": []}
+    )
 
     response = client.post(
         "/ai/training-plans/generate",
@@ -424,7 +435,9 @@ def test_accept_training_plan_does_not_copy_limitations_to_routines(
     plan = client.post(
         "/ai/training-plans/generate",
         headers={"Authorization": f"Bearer {token}"},
-        json=plan_payload(days_per_week=1, physical_limitations="Molestia de rodilla", sensitive_data_acknowledged=True),
+        json=plan_payload(
+            days_per_week=1, physical_limitations="Molestia de rodilla", sensitive_data_acknowledged=True
+        ),
     ).json()
 
     client.post(

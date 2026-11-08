@@ -86,7 +86,8 @@ class AccountService:
             else [],
             "workout_sessions": [_row(item) for item in sessions],
             "workout_sets": [
-                _row(item) for item in db.scalars(select(WorkoutSet).where(WorkoutSet.session_id.in_(session_ids))).all()
+                _row(item)
+                for item in db.scalars(select(WorkoutSet).where(WorkoutSet.session_id.in_(session_ids))).all()
             ]
             if session_ids
             else [],
@@ -123,9 +124,7 @@ class AccountService:
         db.execute(delete(Routine).where(Routine.user_id == user_id))
         db.execute(delete(exercise_muscle_groups).where(exercise_muscle_groups.c.exercise_id.in_(private_exercise_ids)))
         db.execute(delete(exercise_equipment).where(exercise_equipment.c.exercise_id.in_(private_exercise_ids)))
-        db.execute(
-            delete(Exercise).where(Exercise.created_by_user_id == user_id, Exercise.is_global.is_(False))
-        )
+        db.execute(delete(Exercise).where(Exercise.created_by_user_id == user_id, Exercise.is_global.is_(False)))
         # Ejercicios globales creados por el usuario (si los hubiera) se conservan sin autoria.
         db.execute(update(Exercise).where(Exercise.created_by_user_id == user_id).values(created_by_user_id=None))
         db.execute(delete(User).where(User.id == user_id))
