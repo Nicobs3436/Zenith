@@ -1,5 +1,6 @@
 from collections import defaultdict
 from decimal import Decimal
+from itertools import pairwise
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -143,18 +144,28 @@ class AiSessionSummaryService:
         if total_sets == 0:
             warnings.append("La sesion no tiene series registradas.")
             summary = "Sesion registrada sin series; no hay datos suficientes para analizar rendimiento."
-            return summary, improvements, drops, warnings, "Registra series completas en la proxima sesion para recibir un analisis util."
+            return (
+                summary,
+                improvements,
+                drops,
+                warnings,
+                "Registra series completas en la proxima sesion para recibir un analisis util.",
+            )
 
-        summary = f"Sesion con {total_sets} series, {total_reps} repeticiones y {exercise_count} ejercicios registrados."
+        summary = (
+            f"Sesion con {total_sets} series, {total_reps} repeticiones y {exercise_count} ejercicios registrados."
+        )
         volume_by_unit = totals["volume_by_unit"]
         for unit, volume in volume_by_unit.items():
             improvements.append(f"Volumen registrado en {unit}: {volume}.")
         if not improvements:
-            improvements.append("Completaste trabajo sin carga externa registrada; reps y series quedan disponibles para seguimiento.")
+            improvements.append(
+                "Completaste trabajo sin carga externa registrada; reps y series quedan disponibles para seguimiento."
+            )
 
         for exercise in exercises:
             reps_by_set = exercise["reps_by_set"]
-            for previous, current in zip(reps_by_set, reps_by_set[1:]):
+            for previous, current in pairwise(reps_by_set):
                 if current < previous:
                     drops.append(f"{exercise['exercise_name']} bajo de {previous} a {current} reps entre series.")
                     break
@@ -168,7 +179,9 @@ class AiSessionSummaryService:
 
         next_recommendation = "Mantén la progresion y revisa tecnica antes de aumentar carga."
         if warnings:
-            next_recommendation = "Prioriza recuperacion y tecnica en la proxima sesion antes de aumentar volumen o carga."
+            next_recommendation = (
+                "Prioriza recuperacion y tecnica en la proxima sesion antes de aumentar volumen o carga."
+            )
         elif drops:
             next_recommendation = "Mantén la carga y busca reps mas estables entre series antes de progresar."
         return summary, improvements, drops, warnings, next_recommendation

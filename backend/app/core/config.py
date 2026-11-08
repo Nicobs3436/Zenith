@@ -4,7 +4,6 @@ from typing import Annotated, Any, Self
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-
 DEFAULT_SECRET_KEY = "local-development-secret-key-change-me"
 SECURE_ENVIRONMENTS = {"staging", "prod", "production"}
 AI_PROVIDERS = {"internal", "ollama", "groq"}
@@ -64,7 +63,9 @@ class Settings(BaseSettings):
             and self.ai_provider != "internal"
             and not self.ai_external_data_enabled
         ):
-            raise ValueError("APP_AI_EXTERNAL_DATA_ENABLED must be true to use a non-internal AI provider in production.")
+            raise ValueError(
+                "APP_AI_EXTERNAL_DATA_ENABLED must be true to use a non-internal AI provider in production."
+            )
         return self
 
 

@@ -137,7 +137,7 @@ Antes de escanear el QR, abrir desde el movil `http://192.168.1.44:8000/health`.
 - Coach es la experiencia principal del entrenador; guarda perfil/memoria resumida y ultimos mensajes necesarios, no historial completo.
 - Para generar una vista previa, Coach requiere objetivo, sexo biologico, edad, altura, peso, nivel, dias por semana, duracion y equipamiento.
 - Las limitaciones fisicas opcionales se tratan como dato sensible: requieren confirmacion y no sustituyen consejo medico/profesional.
-- La beta no incluye eliminacion/exportacion automatica de cuenta; queda pendiente antes de producto publico.
+- La app permite exportar los datos en JSON y eliminar la cuenta de forma permanente desde Cuenta.
 
 ## Documentacion
 

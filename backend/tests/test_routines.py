@@ -1,6 +1,5 @@
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
-from typing import TypeAlias
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +12,7 @@ from app.infrastructure.db.models.exercise import Exercise
 from app.infrastructure.db.session import get_db
 from app.main import app
 
-SessionFactory: TypeAlias = Callable[[], Session]
+type SessionFactory = Callable[[], Session]
 
 
 @pytest.fixture()
@@ -366,8 +365,20 @@ def test_update_workout_session_replaces_sets(client_with_db: tuple[TestClient, 
             "timezone": "Europe/Madrid",
             "notes": "Updated session",
             "sets": [
-                {"exercise_id": str(second_exercise.id), "set_number": 1, "reps": 8, "weight_value": "60", "weight_unit": "kg"},
-                {"exercise_id": str(second_exercise.id), "set_number": 2, "reps": 7, "weight_value": "60", "weight_unit": "kg"},
+                {
+                    "exercise_id": str(second_exercise.id),
+                    "set_number": 1,
+                    "reps": 8,
+                    "weight_value": "60",
+                    "weight_unit": "kg",
+                },
+                {
+                    "exercise_id": str(second_exercise.id),
+                    "set_number": 2,
+                    "reps": 7,
+                    "weight_value": "60",
+                    "weight_unit": "kg",
+                },
             ],
         },
     )
@@ -518,7 +529,9 @@ def test_delete_workout_session_hides_it(client_with_db: tuple[TestClient, Sessi
 
     assert response.status_code == 204
     assert client.get("/workout-sessions", headers={"Authorization": f"Bearer {token}"}).json() == []
-    assert client.get(f"/workout-sessions/{session_id}", headers={"Authorization": f"Bearer {token}"}).status_code == 404
+    assert (
+        client.get(f"/workout-sessions/{session_id}", headers={"Authorization": f"Bearer {token}"}).status_code == 404
+    )
 
 
 def test_delete_workout_session_returns_404_for_another_users_session(
@@ -658,3 +671,55 @@ def test_create_routine_rejects_unrealistic_target_weight(client_with_db: tuple[
     response = client.post("/routines", headers={"Authorization": f"Bearer {token}"}, json=payload)
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"timezone": "Mars/Olympus"},
+        {"started_at": "2026-07-02T10:00:00"},
+    ],
+)
+def test_create_workout_session_rejects_invalid_timezone_or_naive_dates(
+    client_with_db: tuple[TestClient, SessionFactory], override: dict
+) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+
+    response = client.post(
+        "/workout-sessions",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "started_at": datetime(2026, 7, 2, 10, 0, tzinfo=UTC).isoformat(),
+            "timezone": "Europe/Madrid",
+            "sets": [{"exercise_id": str(exercise.id), "set_number": 1, "reps": 5}],
+            **override,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_workout_session_dates_are_returned_with_timezone(client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "started_at": "2026-07-02T18:00:00+02:00",
+        "timezone": "Europe/Madrid",
+        "sets": [{"exercise_id": str(exercise.id), "set_number": 1, "reps": 5}],
+    }
+    created = client.post("/workout-sessions", headers=headers, json=payload).json()
+
+    fetched = client.get(f"/workout-sessions/{created['id']}", headers=headers).json()
+    # Reenviar lo recibido (como hace la pantalla de edicion) debe ser valido.
+    resent = client.put(
+        f"/workout-sessions/{created['id']}",
+        headers=headers,
+        json={"started_at": fetched["started_at"], "timezone": fetched["timezone"], "sets": payload["sets"]},
+    )
+
+    assert fetched["started_at"] in {"2026-07-02T16:00:00Z", "2026-07-02T16:00:00+00:00"}
+    assert resent.status_code == 200

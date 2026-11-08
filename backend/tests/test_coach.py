@@ -4,7 +4,12 @@ from urllib.error import HTTPError
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
-from tests.test_ai_training_plans import SessionFactory, client_with_db, register_and_login, seed_exercises
+from tests.test_ai_training_plans import (  # noqa: F401  client_with_db es un fixture de pytest
+    SessionFactory,
+    client_with_db,
+    register_and_login,
+    seed_exercises,
+)
 
 
 class FakeGroqResponse:
@@ -58,7 +63,13 @@ def use_fake_groq_http_error(monkeypatch, status_code: int) -> None:
     get_settings.cache_clear()
 
     def fake_urlopen(_request, timeout):
-        raise HTTPError("https://api.groq.com/openai/v1/chat/completions", status_code, "Forbidden", hdrs=None, fp=FakeGroqErrorBody())
+        raise HTTPError(
+            "https://api.groq.com/openai/v1/chat/completions",
+            status_code,
+            "Forbidden",
+            hdrs=None,
+            fp=FakeGroqErrorBody(),
+        )
 
     monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
 
@@ -69,7 +80,16 @@ def empty_interview_response() -> bytes:
             "assistant_message": "Entendido: buscamos fuerza. Para seguir, dime edad, sexo, altura, peso, nivel, dias, duracion y equipamiento.",
             "profile_updates": {},
             "known_facts": ["Objetivo principal: fuerza"],
-            "missing_critical": ["biological_sex", "age", "height_cm", "weight_kg", "experience_level", "days_per_week", "session_duration_minutes", "equipment"],
+            "missing_critical": [
+                "biological_sex",
+                "age",
+                "height_cm",
+                "weight_kg",
+                "experience_level",
+                "days_per_week",
+                "session_duration_minutes",
+                "equipment",
+            ],
             "missing_useful": [],
             "estimated_fields": [],
             "misunderstanding_corrections": [],
@@ -145,7 +165,11 @@ def fake_evidence() -> dict:
         ],
         "limitations": ["PubMed mock."],
         "errors": [],
-        "privacy": {"personal_data_sent_to_pubmed": False, "queries_are_neutral": True, "profile_sent_to_pubmed": False},
+        "privacy": {
+            "personal_data_sent_to_pubmed": False,
+            "queries_are_neutral": True,
+            "profile_sent_to_pubmed": False,
+        },
     }
 
 
@@ -155,7 +179,17 @@ def sensitive_interview_response() -> bytes:
             "assistant_message": "Antes de tratar dolor o lesiones necesito que confirmes el aviso medico. No voy a diagnosticar.",
             "profile_updates": {"physical_limitations": "Dolor de rodilla"},
             "known_facts": [],
-            "missing_critical": ["goal", "biological_sex", "age", "height_cm", "weight_kg", "experience_level", "days_per_week", "session_duration_minutes", "equipment"],
+            "missing_critical": [
+                "goal",
+                "biological_sex",
+                "age",
+                "height_cm",
+                "weight_kg",
+                "experience_level",
+                "days_per_week",
+                "session_duration_minutes",
+                "equipment",
+            ],
             "missing_useful": [],
             "estimated_fields": [],
             "misunderstanding_corrections": [],
@@ -204,17 +238,86 @@ def plan_response(*, days: int = 4) -> bytes:
         )
     payload = {
         "version": 3,
-        "generated_by": {"provider": "groq", "model": "llama-3.3-70b-versatile", "mode": "coach_plan", "backend_validated": False},
-        "program_blueprint": {"split_id": "upper_lower_4", "split_name": "Upper/lower", "horizon_weeks": 10, "strategy": "Volumen moderado y progresion doble."},
-        "coach_rationale": {"summary": "Plan individualizado para hipertrofia con volumen recuperable.", "why_this_split": "Frecuencia 2", "why_this_volume": "Punto inicial razonable", "why_these_exercises": "Alta estabilidad", "tradeoffs": []},
+        "generated_by": {
+            "provider": "groq",
+            "model": "llama-3.3-70b-versatile",
+            "mode": "coach_plan",
+            "backend_validated": False,
+        },
+        "program_blueprint": {
+            "split_id": "upper_lower_4",
+            "split_name": "Upper/lower",
+            "horizon_weeks": 10,
+            "strategy": "Volumen moderado y progresion doble.",
+        },
+        "coach_rationale": {
+            "summary": "Plan individualizado para hipertrofia con volumen recuperable.",
+            "why_this_split": "Frecuencia 2",
+            "why_this_volume": "Punto inicial razonable",
+            "why_these_exercises": "Alta estabilidad",
+            "tradeoffs": [],
+        },
         "exercise_resolution": {"summary": {}, "items": []},
-        "weekly_schedule": [{"day": day, "routine_key": f"day_{day}", "name": f"Sesion IA {day}", "focus": "hipertrofia", "target_duration_minutes": 60, "intent": "Progresar con buena tecnica."} for day in range(1, days + 1)],
-        "volume_by_muscle": {"Pecho": {"direct_sets": 12, "indirect_sets": 0, "target_range": [8, 14], "priority": True, "status": "in_range"}},
-        "progression_model": {"type": "double_progression", "block_weeks": 10, "load_rule": "Sube carga al completar el rango con RIR objetivo.", "rep_rule": "Primero reps, luego carga.", "rir_targets_by_week": [{"week": 1, "rir": 3}], "deload_rule": "Descarga si cae rendimiento y sube fatiga."},
+        "weekly_schedule": [
+            {
+                "day": day,
+                "routine_key": f"day_{day}",
+                "name": f"Sesion IA {day}",
+                "focus": "hipertrofia",
+                "target_duration_minutes": 60,
+                "intent": "Progresar con buena tecnica.",
+            }
+            for day in range(1, days + 1)
+        ],
+        "volume_by_muscle": {
+            "Pecho": {
+                "direct_sets": 12,
+                "indirect_sets": 0,
+                "target_range": [8, 14],
+                "priority": True,
+                "status": "in_range",
+            }
+        },
+        "progression_model": {
+            "type": "double_progression",
+            "block_weeks": 10,
+            "load_rule": "Sube carga al completar el rango con RIR objetivo.",
+            "rep_rule": "Primero reps, luego carga.",
+            "rir_targets_by_week": [{"week": 1, "rir": 3}],
+            "deload_rule": "Descarga si cae rendimiento y sube fatiga.",
+        },
         "routines": routines,
         "validation_report": {"status": "passed", "checks": [], "warnings": []},
-        "acceptance_effects": {"will_create_private_exercises": True, "private_exercise_count": 0, "will_create_routines": True, "routine_count": days, "requires_user_acceptance": True},
-        "coach_report": {"user_data_summary": "Intermedio orientado a hipertrofia.", "assumptions": ["Volumen inicial moderado"], "measurable_goals": ["Progresar reps o carga semanalmente"], "split_justification": "Upper/lower por frecuencia y recuperacion.", "weekly_calendar": [], "training_tables_summary": "Ver rutinas.", "progression_system": "Doble progresion.", "warmup": "Series de aproximacion.", "fatigue_and_deload": "Descargar si empeoran indicadores.", "tracking_template": "Carga, reps, RIR y dolor.", "nutrition_and_recovery": "Proteina y superavit moderado.", "substitutions": [], "mistakes_to_avoid": ["Entrenar con dolor creciente"], "scientific_references": [{"title": "Resistance training volume enhances muscle hypertrophy", "year": "2017", "evidence_level": "moderate"}], "next_review_questions": ["Enviame registros semanales."]},
+        "acceptance_effects": {
+            "will_create_private_exercises": True,
+            "private_exercise_count": 0,
+            "will_create_routines": True,
+            "routine_count": days,
+            "requires_user_acceptance": True,
+        },
+        "coach_report": {
+            "user_data_summary": "Intermedio orientado a hipertrofia.",
+            "assumptions": ["Volumen inicial moderado"],
+            "measurable_goals": ["Progresar reps o carga semanalmente"],
+            "split_justification": "Upper/lower por frecuencia y recuperacion.",
+            "weekly_calendar": [],
+            "training_tables_summary": "Ver rutinas.",
+            "progression_system": "Doble progresion.",
+            "warmup": "Series de aproximacion.",
+            "fatigue_and_deload": "Descargar si empeoran indicadores.",
+            "tracking_template": "Carga, reps, RIR y dolor.",
+            "nutrition_and_recovery": "Proteina y superavit moderado.",
+            "substitutions": [],
+            "mistakes_to_avoid": ["Entrenar con dolor creciente"],
+            "scientific_references": [
+                {
+                    "title": "Resistance training volume enhances muscle hypertrophy",
+                    "year": "2017",
+                    "evidence_level": "moderate",
+                }
+            ],
+            "next_review_questions": ["Enviame registros semanales."],
+        },
         "explanation": "Vista previa generada por Coach.",
         "risk_notes": "No sustituye consejo medico.",
         "confidence": "medium",
@@ -256,7 +359,9 @@ def test_coach_initial_state(client_with_db: tuple[TestClient, SessionFactory]) 
     assert "tokens" in body["privacy_notice"]
 
 
-def test_coach_message_uses_groq_and_updates_profile(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_coach_message_uses_groq_and_updates_profile(
+    monkeypatch, client_with_db: tuple[TestClient, SessionFactory]
+) -> None:
     client, _session_factory = client_with_db
     use_fake_groq_sequence(monkeypatch, [interview_response()])
     token = register_and_login(client, "coach-profile@example.com", "coach_profile")
@@ -277,7 +382,9 @@ def test_coach_message_uses_groq_and_updates_profile(monkeypatch, client_with_db
     assert body["known_facts"]
 
 
-def test_coach_message_understands_strength_in_natural_language(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_coach_message_understands_strength_in_natural_language(
+    monkeypatch, client_with_db: tuple[TestClient, SessionFactory]
+) -> None:
     client, _session_factory = client_with_db
     use_fake_groq_sequence(monkeypatch, [empty_interview_response()])
     token = register_and_login(client, "coach-strength@example.com", "coach_strength")
@@ -298,7 +405,9 @@ def test_coach_message_understands_strength_in_natural_language(monkeypatch, cli
     assert "goal" not in body["missing_critical"]
 
 
-def test_coach_message_retries_groq_free_tier_rate_limit(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_coach_message_retries_groq_free_tier_rate_limit(
+    monkeypatch, client_with_db: tuple[TestClient, SessionFactory]
+) -> None:
     client, _session_factory = client_with_db
     monkeypatch.setenv("APP_AI_PROVIDER", "groq")
     monkeypatch.setenv("APP_AI_GROQ_API_KEY", "test-groq-key")
@@ -313,7 +422,13 @@ def test_coach_message_retries_groq_free_tier_rate_limit(monkeypatch, client_wit
         item = queue.pop(0)
         if item == "rate_limit":
             body = b'{"error":{"message":"Rate limit reached. Please try again in 1ms."}}'
-            raise HTTPError("https://api.groq.com/openai/v1/chat/completions", 429, "Too Many Requests", hdrs=None, fp=FakeGroqErrorBody(body))
+            raise HTTPError(
+                "https://api.groq.com/openai/v1/chat/completions",
+                429,
+                "Too Many Requests",
+                hdrs=None,
+                fp=FakeGroqErrorBody(body),
+            )
         return FakeGroqResponse(item)
 
     monkeypatch.setattr("app.application.ai_provider.urlopen", fake_urlopen)
@@ -336,7 +451,9 @@ def test_coach_message_retries_groq_free_tier_rate_limit(monkeypatch, client_wit
     assert request_bodies[0]["max_tokens"] == 600
 
 
-def test_coach_does_not_store_limitations_without_ack(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_coach_does_not_store_limitations_without_ack(
+    monkeypatch, client_with_db: tuple[TestClient, SessionFactory]
+) -> None:
     client, _session_factory = client_with_db
     use_fake_groq_sequence(monkeypatch, [sensitive_interview_response()])
     token = register_and_login(client, "coach-sensitive@example.com", "coach_sensitive")
@@ -356,7 +473,9 @@ def test_coach_does_not_store_limitations_without_ack(monkeypatch, client_with_d
     assert response.json()["safety_flags"] == ["dolor requiere precaucion"]
 
 
-def test_coach_message_requires_personal_data_ack_for_external_provider(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_coach_message_requires_personal_data_ack_for_external_provider(
+    monkeypatch, client_with_db: tuple[TestClient, SessionFactory]
+) -> None:
     client, _session_factory = client_with_db
     calls: list[object] = []
     monkeypatch.setenv("APP_AI_PROVIDER", "groq")
@@ -378,7 +497,9 @@ def test_coach_message_requires_personal_data_ack_for_external_provider(monkeypa
     assert state["profile"]["age"] is None
 
 
-def test_coach_message_returns_readable_error_when_groq_fails(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_coach_message_returns_readable_error_when_groq_fails(
+    monkeypatch, client_with_db: tuple[TestClient, SessionFactory]
+) -> None:
     client, _session_factory = client_with_db
     use_fake_groq_sequence(monkeypatch, [b"not-json"])
     token = register_and_login(client, "coach-error@example.com", "coach_error")
@@ -397,7 +518,9 @@ def test_coach_message_returns_readable_error_when_groq_fails(monkeypatch, clien
     assert response.json()["detail"] == "Groq returned invalid JSON."
 
 
-def test_coach_message_returns_groq_status_when_provider_forbidden(monkeypatch, client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_coach_message_returns_groq_status_when_provider_forbidden(
+    monkeypatch, client_with_db: tuple[TestClient, SessionFactory]
+) -> None:
     client, _session_factory = client_with_db
     use_fake_groq_http_error(monkeypatch, 403)
     token = register_and_login(client, "coach-forbidden@example.com", "coach_forbidden")
@@ -420,7 +543,9 @@ def test_coach_generates_groq_plan_draft(monkeypatch, client_with_db: tuple[Test
     client, session_factory = client_with_db
     seed_exercises(session_factory)
     use_fake_groq_sequence(monkeypatch, [interview_response(), evidence_query_response(), plan_response(days=4)])
-    monkeypatch.setattr("app.application.coach_service.evidence_search_service.search_many", lambda _queries: fake_evidence())
+    monkeypatch.setattr(
+        "app.application.coach_service.evidence_search_service.search_many", lambda _queries: fake_evidence()
+    )
     token = register_and_login(client, "coach-groq@example.com", "coach_groq")
     complete_coach_profile(client, token)
 
@@ -440,3 +565,23 @@ def test_coach_generates_groq_plan_draft(monkeypatch, client_with_db: tuple[Test
     state = client.get("/ai/coach", headers=auth_headers(token)).json()
     assert state["phase"] == "plan_draft"
     assert len(state["draft_plans"]) == 1
+
+
+def test_coach_ignores_malformed_list_updates_instead_of_erasing_them(
+    monkeypatch, client_with_db: tuple[TestClient, SessionFactory]
+) -> None:
+    client, _session_factory = client_with_db
+    malformed = json.loads(json.loads(empty_interview_response())["choices"][0]["message"]["content"])
+    malformed["profile_updates"] = {"equipment": "gimnasio completo"}
+    use_fake_groq_sequence(monkeypatch, [interview_response(), groq_chat_response(malformed)])
+    token = register_and_login(client, "coach-lists@example.com", "coach_lists")
+    complete_coach_profile(client, token)
+
+    response = client.post(
+        "/ai/coach/messages",
+        headers=auth_headers(token),
+        json={"message": "Sigo con el mismo material.", "personal_data_acknowledged": True},
+    )
+
+    assert response.status_code == 200
+    assert "mancuernas" in response.json()["profile"]["equipment"]

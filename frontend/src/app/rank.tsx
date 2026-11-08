@@ -63,13 +63,13 @@ export default function RankScreen() {
   const progress = Math.max(8, Math.min(100, scoreNumber > 0 ? scoreNumber % 100 : 8));
   const scoreParts = rank ? [
     { label: 'Volumen', value: rank.volume_score, color: routineAccents[0] },
-    { label: 'Progresion', value: rank.progression_score, color: routineAccents[1] },
+    { label: 'Progresión', value: rank.progression_score, color: routineAccents[1] },
     { label: 'Amplitud', value: rank.breadth_score, color: routineAccents[2] },
   ] : [];
 
   return (
     <ZenithScreen bottomNav={<ZenithBottomNav />}>
-      <ZenithHeader title="Rango" subtitle="Progresion" />
+      <ZenithHeader title="Rango" subtitle="Progresión" />
       {loading && <ZenithNotice>Cargando rango...</ZenithNotice>}
       {notice && <ZenithNotice tone="success">{notice}</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
@@ -91,7 +91,7 @@ export default function RankScreen() {
             <View style={styles.progressBlock}>
               <View style={styles.progressLabels}>
                 <Text style={styles.progressLabel}>{rank.rank.name}</Text>
-                <Text style={styles.progressLabel}>{rank.next_rank?.name ?? 'Maximo'}</Text>
+                <Text style={styles.progressLabel}>{rank.next_rank?.name ?? 'Máximo'}</Text>
               </View>
               <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View>
             </View>
@@ -115,7 +115,7 @@ export default function RankScreen() {
           <ZenithCard style={styles.card}>
             <Text style={styles.sectionTitle}>Como se calcula</Text>
             {rankExplanationLines.map((line) => <Text key={line} style={styles.note}>{line}</Text>)}
-            <Pressable onPress={toggleRankScale} style={styles.secondaryAction}>
+            <Pressable accessibilityRole="button" onPress={toggleRankScale} style={styles.secondaryAction}>
               <Text style={styles.secondaryActionText}>{showRankScale ? 'Ocultar escala de rangos' : 'Ver escala de rangos'}</Text>
             </Pressable>
             {showRankScale && (
@@ -148,14 +148,14 @@ const styles = StyleSheet.create({
   heroContent: { alignItems: 'center', flexDirection: 'row', gap: 14 },
   trophy: { alignItems: 'center', backgroundColor: zenith.colors.primarySoft, borderRadius: 18, height: 58, justifyContent: 'center', width: 58 },
   rankInfo: { flex: 1 },
-  kicker: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' },
+  kicker: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase' },
   rank: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 36, lineHeight: 38, textTransform: 'uppercase' },
   scoreLine: { alignItems: 'baseline', flexDirection: 'row', gap: 6 },
   score: { color: zenith.colors.primary, fontFamily: zenith.font.display, fontSize: 34, lineHeight: 36 },
   note: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 12, lineHeight: 19 },
   progressBlock: { gap: 6 },
   progressLabels: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10 },
+  progressLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11 },
   progressTrack: { backgroundColor: zenith.colors.secondary, borderRadius: 999, height: 8, overflow: 'hidden' },
   progressFill: { backgroundColor: zenith.colors.primary, borderRadius: 999, height: '100%' },
   next: { color: zenith.colors.primary, fontFamily: zenith.font.bodyBold, fontSize: 13 },

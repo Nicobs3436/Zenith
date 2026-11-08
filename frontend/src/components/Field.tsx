@@ -4,9 +4,10 @@ import { zenith } from '@/constants/zenithTheme';
 
 type FieldProps = TextInputProps & {
   label: string;
+  hint?: string;
 };
 
-export function Field({ label, keyboardType, multiline, returnKeyType, selectTextOnFocus, style, ...props }: FieldProps) {
+export function Field({ label, hint, keyboardType, multiline, returnKeyType, selectTextOnFocus, style, ...props }: FieldProps) {
   const numericKeyboard = keyboardType === 'numeric' || keyboardType === 'number-pad' || keyboardType === 'decimal-pad';
 
   return (
@@ -19,20 +20,29 @@ export function Field({ label, keyboardType, multiline, returnKeyType, selectTex
         returnKeyType={returnKeyType ?? (multiline ? 'default' : 'next')}
         selectTextOnFocus={selectTextOnFocus ?? numericKeyboard}
         style={[styles.input, multiline && styles.multiline, style]}
+        accessibilityLabel={label}
+        accessibilityHint={hint}
         {...props}
       />
+      {hint && <Text style={styles.hint}>{hint}</Text>}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  hint: {
+    color: zenith.colors.muted,
+    fontFamily: zenith.font.body,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   container: {
     gap: 8,
   },
   label: {
     color: zenith.colors.muted,
     fontFamily: zenith.font.mono,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },

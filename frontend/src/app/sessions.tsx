@@ -7,7 +7,7 @@ import { deleteWorkoutSession, Exercise, getExercises, getRoutines, getWorkoutSe
 import { ZenithCard, ZenithHeader, ZenithIconButton, ZenithNotice, ZenithPill } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { routineAccents, zenith } from '@/constants/zenithTheme';
-import { formatVolumeByUnit, plannedRoutineExercises, routineName, uniqueExerciseNames } from '@/utils/workoutDisplay';
+import { countLabel, formatVolumeByUnit, plannedRoutineExercises, routineName, uniqueExerciseNames } from '@/utils/workoutDisplay';
 
 export default function SessionsScreen() {
   const { notice } = useLocalSearchParams();
@@ -31,7 +31,7 @@ export default function SessionsScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  const noticeText = notice === 'created' ? 'Sesion registrada.' : notice === 'updated' ? 'Sesion guardada.' : notice === 'deleted' ? 'Sesion eliminada.' : null;
+  const noticeText = notice === 'created' ? 'Sesión registrada.' : notice === 'updated' ? 'Sesión guardada.' : notice === 'deleted' ? 'Sesión eliminada.' : null;
 
   async function submitDeleteSession(sessionId: string) {
     if (deleteConfirm !== sessionId) {
@@ -47,9 +47,9 @@ export default function SessionsScreen() {
       await deleteWorkoutSession(sessionId);
       setSessions((current) => current.filter((session) => session.id !== sessionId));
       setDeleteConfirm(null);
-      setActionNotice('Sesion eliminada. Ya no contara para estadisticas ni rango.');
+      setActionNotice('Sesión eliminada. Ya no contara para estadísticas ni rango.');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'No se pudo eliminar la sesion.');
+      setError(caught instanceof Error ? caught.message : 'No se pudo eliminar la sesión.');
     } finally {
       setDeletingSession(null);
     }
@@ -57,7 +57,7 @@ export default function SessionsScreen() {
 
   return (
     <ZenithScreen>
-      <ZenithHeader title="Sesiones" subtitle="Entrenamiento" right={<ZenithIconButton href="/session-new"><Plus color={zenith.colors.primary} size={17} /></ZenithIconButton>} />
+      <ZenithHeader title="Sesiones" subtitle="Entrenamiento" right={<ZenithIconButton href="/session-new" label="Registrar sesión manual"><Plus color={zenith.colors.primary} size={17} /></ZenithIconButton>} />
       {noticeText && <ZenithNotice tone="success">{noticeText}</ZenithNotice>}
       {actionNotice && <ZenithNotice tone="success">{actionNotice}</ZenithNotice>}
       {loading && <ZenithNotice>Cargando rutinas y sesiones...</ZenithNotice>}
@@ -72,13 +72,13 @@ export default function SessionsScreen() {
         <ZenithCard key={routine.id} style={[styles.card, { borderLeftColor: accent }]}>
           <Text style={styles.name}>{routine.name}</Text>
           {routine.goal && <Text style={styles.meta}>{routine.goal}</Text>}
-          <Text style={styles.meta}>{plannedExercises.length} ejercicios planificados</Text>
+          <Text style={styles.meta}>{countLabel(plannedExercises.length, 'ejercicio planificado', 'ejercicios planificados')}</Text>
           <Link href={{ pathname: '/session-active', params: { routineId: routine.id } }} style={StyleSheet.flatten([styles.action, { backgroundColor: accent }])}>Empezar rutina</Link>
         </ZenithCard>
         );
       })}
 
-      <Link href="/session-new" style={styles.secondaryAction}>Registrar sesion libre</Link>
+      <Link href="/session-new" style={styles.secondaryAction}>Registrar sesión libre</Link>
 
       <Text style={styles.section}>Historial</Text>
       {!loading && !error && sessions.length === 0 && <ZenithNotice>Aun no registraste sesiones.</ZenithNotice>}
@@ -86,17 +86,17 @@ export default function SessionsScreen() {
         <ZenithCard key={session.id} style={styles.historyCard}>
           <Text style={styles.name}>{new Date(session.started_at).toLocaleString()}</Text>
           <ZenithPill active>{routineName(session.routine_id, routines)}</ZenithPill>
-          <Text style={styles.meta}>{session.sets.length} series registradas</Text>
+          <Text style={styles.meta}>{countLabel(session.sets.length, 'serie registrada', 'series registradas')}</Text>
           <Text style={styles.meta}>Volumen: {formatVolumeByUnit(session.sets)}</Text>
           <Text style={styles.exercises}>{uniqueExerciseNames(session.sets, exercises) || 'Sin ejercicios'}</Text>
           <View style={styles.actionsRow}>
             <Link href={{ pathname: '/session-detail', params: { sessionId: session.id } }} style={styles.link}>Ver detalle</Link>
             <Link href={{ pathname: '/session-edit', params: { sessionId: session.id } }} style={styles.link}>Editar</Link>
-            <Pressable disabled={deletingSession === session.id} onPress={() => submitDeleteSession(session.id)} style={[styles.deleteButton, deletingSession === session.id && styles.disabled]}>
+            <Pressable accessibilityRole="button" disabled={deletingSession === session.id} onPress={() => submitDeleteSession(session.id)} style={[styles.deleteButton, deletingSession === session.id && styles.disabled]}>
               <Text style={styles.deleteText}>{deletingSession === session.id ? 'Eliminando...' : deleteConfirm === session.id ? 'Confirmar' : 'Eliminar'}</Text>
             </Pressable>
           </View>
-          {deleteConfirm === session.id && <Text style={styles.deleteHint}>Pulsa Confirmar para ocultar esta sesion.</Text>}
+          {deleteConfirm === session.id && <Text style={styles.deleteHint}>Pulsa Confirmar para ocultar esta sesión.</Text>}
         </ZenithCard>
       ))}
     </ZenithScreen>

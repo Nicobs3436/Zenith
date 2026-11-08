@@ -70,7 +70,7 @@ export default function ExercisesScreen() {
       <ZenithHeader
         subtitle={`${exercises.length} en catalogo`}
         title="Ejercicios"
-        right={<ZenithIconButton href={'/exercise-new' as never}><Plus color={zenith.colors.primary} size={17} /></ZenithIconButton>}
+        right={<ZenithIconButton href={'/exercise-new' as never} label="Nuevo ejercicio"><Plus color={zenith.colors.primary} size={17} /></ZenithIconButton>}
       />
       {noticeText && <ZenithNotice tone="success">{noticeText}</ZenithNotice>}
 
@@ -88,7 +88,7 @@ export default function ExercisesScreen() {
       </View>
 
       <View style={styles.chips}>
-        <FilterGroup label="Musculo" options={muscleOptions.map((value) => ({ label: value, value }))} selectedValue={muscle} onChange={setMuscle} />
+        <FilterGroup label="Músculo" options={muscleOptions.map((value) => ({ label: value, value }))} selectedValue={muscle} onChange={setMuscle} />
         <FilterGroup label="Equipo" options={equipmentOptions.map((value) => ({ label: value, value }))} selectedValue={equipment} onChange={setEquipment} />
         <FilterGroup label="Dificultad" options={difficultyOptions.map((value) => ({ label: value === ALL ? value : difficultyLabel(value), value }))} selectedValue={difficulty} onChange={setDifficulty} />
         <FilterGroup label="Origen" options={ORIGINS} selectedValue={origin} onChange={(value) => setOrigin(value as OriginFilter)} />
@@ -97,7 +97,7 @@ export default function ExercisesScreen() {
       <View style={styles.resultsHeader}>
         <Text style={styles.resultCount}>{filtered.length} resultado(s)</Text>
         {hasFilters && (
-          <Pressable onPress={clearFilters} style={styles.clearButton}>
+          <Pressable accessibilityRole="button" onPress={clearFilters} style={styles.clearButton}>
             <Text style={styles.clearText}>Limpiar filtros</Text>
           </Pressable>
         )}
@@ -149,7 +149,7 @@ function normalize(value: string) {
 }
 
 function primaryMuscle(exercise: Exercise) {
-  return exercise.muscle_groups[0]?.name ?? 'Sin musculo';
+  return exercise.muscle_groups[0]?.name ?? 'Sin músculo';
 }
 
 function equipmentLabel(exercise: Exercise) {
@@ -177,7 +177,7 @@ function FilterGroup({ label, onChange, options, selectedValue }: { label: strin
         {options.map((option) => {
           const active = option.value === selectedValue;
           return (
-            <Pressable key={option.value} onPress={() => onChange(option.value)} style={[styles.chip, active && styles.chipActive]}>
+            <Pressable accessibilityRole="button" key={option.value} onPress={() => onChange(option.value)} style={[styles.chip, active && styles.chipActive]}>
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
             </Pressable>
           );
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   searchInput: { color: zenith.colors.foreground, flex: 1, fontFamily: zenith.font.body, paddingVertical: 12 },
   chips: { gap: 12 },
   filterGroup: { gap: 7 },
-  filterLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
+  filterLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase' },
   filterChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: zenith.colors.secondary, borderColor: zenith.colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
   chipActive: { backgroundColor: zenith.colors.primary, borderColor: zenith.colors.primary },
@@ -209,5 +209,5 @@ const styles = StyleSheet.create({
   name: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, fontSize: 14 },
   meta: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 11 },
   badges: { alignItems: 'flex-end', gap: 3 },
-  origin: { color: zenith.colors.primary, fontFamily: zenith.font.mono, fontSize: 10 },
+  origin: { color: zenith.colors.primary, fontFamily: zenith.font.mono, fontSize: 11 },
 });

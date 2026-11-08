@@ -14,7 +14,7 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => voi
     <ZenithScreen bottomNav={<ZenithBottomNav />}>
       <ZenithHeader title="Rutinas" subtitle="Error de pantalla" />
       <ZenithNotice tone="danger">No se pudo mostrar Rutinas: {error.message}</ZenithNotice>
-      <Pressable onPress={retry} style={styles.retryButton}>
+      <Pressable accessibilityRole="button" onPress={retry} style={styles.retryButton}>
         <Text style={styles.retryText}>Reintentar</Text>
       </Pressable>
       <Link href="/dashboard" style={styles.edit}>Volver al inicio</Link>
@@ -142,7 +142,7 @@ export default function RoutinesScreen() {
       <ZenithHeader
         subtitle={`${routines.length} planes activos`}
         title="Rutinas"
-        right={<ZenithIconButton href="/routine-new"><Plus color={zenith.colors.primary} size={17} /></ZenithIconButton>}
+        right={<ZenithIconButton href="/routine-new" label="Nueva rutina"><Plus color={zenith.colors.primary} size={17} /></ZenithIconButton>}
       />
       {noticeText && <ZenithNotice tone="success">{noticeText}</ZenithNotice>}
       {actionNotice && <ZenithNotice tone="success">{actionNotice}</ZenithNotice>}
@@ -152,7 +152,7 @@ export default function RoutinesScreen() {
       {routinesError && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{routinesError}</Text>
-          <Pressable onPress={retryRoutines} style={styles.retryButton}>
+          <Pressable accessibilityRole="button" onPress={retryRoutines} style={styles.retryButton}>
             <Text style={styles.retryText}>Reintentar</Text>
           </Pressable>
         </View>
@@ -173,7 +173,7 @@ export default function RoutinesScreen() {
             </View>
 
             <View style={styles.exerciseList}>
-              {plannedExercises.length === 0 && <Text style={styles.emptyRoutineText}>Sin ejercicios planificados validos.</Text>}
+              {plannedExercises.length === 0 && <Text style={styles.emptyRoutineText}>Sin ejercicios planificados válidos.</Text>}
               {plannedExercises.slice(0, 5).map((planned) => (
                 <View key={planned.id ?? `${planned.exercise_id}-${planned.position}`} style={styles.exerciseRow}>
                   <View style={[styles.dot, { backgroundColor: accent }]} />
@@ -185,17 +185,17 @@ export default function RoutinesScreen() {
 
             <View style={styles.actions}>
               <Link href={{ pathname: '/session-active', params: { routineId: routine.id } }} asChild>
-                <Pressable style={StyleSheet.flatten([styles.startButton, { backgroundColor: accent }])}>
+                <Pressable accessibilityRole="button" style={StyleSheet.flatten([styles.startButton, { backgroundColor: accent }])}>
                   <Play color={zenith.colors.primaryForeground} fill={zenith.colors.primaryForeground} size={13} />
                   <Text style={styles.startText}>Iniciar</Text>
                 </Pressable>
               </Link>
-              <Pressable disabled={workingRoutine === routine.id} onPress={() => submitAnalyzeGoal(routine.id)} style={[styles.aiButton, workingRoutine === routine.id && styles.disabled]}>
+              <Pressable accessibilityRole="button" disabled={workingRoutine === routine.id} onPress={() => submitAnalyzeGoal(routine.id)} style={[styles.aiButton, workingRoutine === routine.id && styles.disabled]}>
                 <Bot color={zenith.colors.primary} size={13} />
                 <Text style={styles.aiText}>{workingRoutine === routine.id ? 'Analizando...' : 'IA'}</Text>
               </Pressable>
               <Link href={{ pathname: '/routine-edit', params: { routineId: routine.id } }} style={styles.edit}>Editar</Link>
-              <Pressable disabled={deletingRoutine === routine.id} onPress={() => submitDeleteRoutine(routine.id)} style={[styles.deleteButton, deletingRoutine === routine.id && styles.disabled]}>
+              <Pressable accessibilityRole="button" disabled={deletingRoutine === routine.id} onPress={() => submitDeleteRoutine(routine.id)} style={[styles.deleteButton, deletingRoutine === routine.id && styles.disabled]}>
                 <Text style={styles.deleteText}>{deletingRoutine === routine.id ? 'Eliminando...' : deleteConfirm === routine.id ? 'Confirmar' : 'Eliminar'}</Text>
               </Pressable>
             </View>
@@ -204,7 +204,7 @@ export default function RoutinesScreen() {
         );
       })}
       <Link href="/routine-new" asChild>
-        <Pressable style={styles.createButton}>
+        <Pressable accessibilityRole="button" style={styles.createButton}>
           <Plus color={zenith.colors.primaryForeground} size={16} />
           <Text style={styles.createText}>Crear rutina</Text>
         </Pressable>
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   emptyRoutineText: { color: zenith.colors.muted, fontFamily: zenith.font.body, lineHeight: 20 },
   dot: { borderRadius: 999, height: 5, width: 5 },
   exerciseName: { color: zenith.colors.foreground, flex: 1, fontFamily: zenith.font.bodyMedium, fontSize: 13 },
-  exerciseMeta: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10 },
+  exerciseMeta: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11 },
   actions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   startButton: { alignItems: 'center', borderRadius: 13, flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'center', padding: 11 },
   startText: { color: zenith.colors.primaryForeground, fontFamily: zenith.font.bodyBold, fontSize: 13 },

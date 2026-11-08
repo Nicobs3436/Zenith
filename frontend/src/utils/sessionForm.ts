@@ -52,18 +52,44 @@ export function rowsFromRoutine(routine: Routine): SetRow[] {
     });
 }
 
+// Acepta coma decimal (teclados en espanol): "62,5" -> 62.5.
+export function normalizeDecimalInput(value: string) {
+  return value.trim().replace(',', '.');
+}
+
+// Fecha legible en hora local del dispositivo: "2026-07-02 10:05". Es lo que el usuario edita.
+export function formatLocalDateTime(value: Date | string) {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const pad = (part: number) => part.toString().padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+// Convierte la fecha escrita por el usuario a ISO con zona. Sin offset se interpreta como hora local
+// del dispositivo (lo que el usuario ve), nunca como UTC silencioso. Devuelve null si no es valida.
+export function toIsoDateTime(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const parsed = new Date(trimmed.includes('T') || !trimmed.includes(' ') ? trimmed : trimmed.replace(' ', 'T'));
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 // Mismos topes que el backend (backend/app/domain/routines.py).
 const MAX_WEIGHT = 2500;
 const MAX_REPS = 1000;
 
 function parseOptionalNumber(value: string, label: string, min: number, max?: number) {
-  const trimmed = value.trim();
+  const trimmed = normalizeDecimalInput(value);
   if (!trimmed) {
     return { value: null, error: null };
   }
   const parsed = Number(trimmed);
   if (Number.isNaN(parsed) || parsed < min || (max !== undefined && parsed > max)) {
-    return { value: null, error: `${label} no es valido.` };
+    return { value: null, error: `${label} no es válido.` };
   }
   return { value: parsed, error: null };
 }
@@ -75,7 +101,7 @@ function parseOptionalInteger(value: string, label: string, min: number) {
   }
   const parsed = Number(trimmed);
   if (!Number.isInteger(parsed) || parsed < min) {
-    return { value: null, error: `${label} no es valido.` };
+    return { value: null, error: `${label} no es válido.` };
   }
   return { value: parsed, error: null };
 }
@@ -90,7 +116,7 @@ export function buildWorkoutSets(rows: SetRow[]): BuildSetsResult {
 
     const reps = Number(row.reps.trim());
     if (!Number.isInteger(reps) || reps < 0 || reps > MAX_REPS) {
-      return { sets: null, error: `Las reps de la serie ${index + 1} no son validas.` };
+      return { sets: null, error: `Las reps de la serie ${index + 1} no son válidas.` };
     }
 
     const weight = parseOptionalNumber(row.weight_value, `El peso de la serie ${index + 1}`, 0, MAX_WEIGHT);
@@ -117,8 +143,8 @@ export function buildWorkoutSets(rows: SetRow[]): BuildSetsResult {
       exercise_id: row.exercise_id,
       set_number: index + 1,
       reps,
-      ...(weight.value !== null ? { weight_value: row.weight_value.trim(), weight_unit: row.weight_unit } : {}),
-      ...(rpe.value !== null ? { rpe: row.rpe.trim() } : {}),
+      ...(weight.value !== null ? { weight_value: normalizeDecimalInput(row.weight_value), weight_unit: row.weight_unit } : {}),
+      ...(rpe.value !== null ? { rpe: normalizeDecimalInput(row.rpe) } : {}),
       ...(rir.value !== null ? { rir: rir.value } : {}),
       ...(restSeconds.value !== null ? { rest_seconds: restSeconds.value } : {}),
       ...(row.notes.trim() ? { notes: row.notes.trim() } : {}),

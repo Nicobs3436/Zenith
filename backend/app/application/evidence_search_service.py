@@ -1,7 +1,7 @@
-from dataclasses import dataclass
 import json
-from typing import Any
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
@@ -105,17 +105,21 @@ class EvidenceSearchService:
             title = self._all_text(article.find(".//ArticleTitle"))
             if not pmid or not title:
                 continue
-            abstract = "\n".join(
-                part
-                for part in [self._all_text(item) for item in article.findall(".//Abstract/AbstractText")]
-                if part
-            ) or None
+            abstract = (
+                "\n".join(
+                    part
+                    for part in [self._all_text(item) for item in article.findall(".//Abstract/AbstractText")]
+                    if part
+                )
+                or None
+            )
             cards.append(
                 EvidenceCard(
                     title=title[:500],
                     authors=self._authors(article),
                     year=self._year(article),
-                    journal=self._all_text(article.find(".//Journal/Title")) or self._all_text(article.find(".//MedlineTA")),
+                    journal=self._all_text(article.find(".//Journal/Title"))
+                    or self._all_text(article.find(".//MedlineTA")),
                     pmid=pmid,
                     doi=self._doi(article),
                     abstract=abstract[:1_500] if abstract else None,
@@ -189,7 +193,10 @@ class EvidenceSearchService:
 
     def _evidence_level(self, title: str, abstract: str | None) -> str:
         text = f"{title} {abstract or ''}".lower()
-        if any(marker in text for marker in ["systematic review", "meta-analysis", "meta analysis", "position stand", "guideline"]):
+        if any(
+            marker in text
+            for marker in ["systematic review", "meta-analysis", "meta analysis", "position stand", "guideline"]
+        ):
             return "solid"
         if any(marker in text for marker in ["randomized", "controlled trial", "clinical trial"]):
             return "moderate"

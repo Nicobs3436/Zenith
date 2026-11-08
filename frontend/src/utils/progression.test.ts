@@ -42,7 +42,7 @@ describe('progression', () => {
     const result = progressionHintForExercise(planned(), []);
 
     expect(result.lastSummary).toBe('Sin sesiones previas.');
-    expect(result.recommendation).toBe('Empieza con una carga conservadora y prioriza tecnica.');
+    expect(result.recommendation).toBe('Empieza con una carga conservadora y prioriza técnica.');
   });
 
   it('uses the latest matching session only', () => {
@@ -51,13 +51,13 @@ describe('progression', () => {
       session('2026-07-10T10:00:00Z', [10, 11], '50'),
     ]);
 
-    expect(result.lastSummary).toBe('Ultima vez: 2 series, 10-11 reps, hasta 50 kg.');
+    expect(result.lastSummary).toBe('Última vez: 2 series, 10-11 reps, hasta 50 kg.');
   });
 
   it('recommends increasing load when the top rep range is completed with manageable RPE', () => {
     const result = progressionHintForExercise(planned(), [session('2026-07-10T10:00:00Z', [10, 10], '50', '8')]);
 
-    expect(result.recommendation).toBe('Si calentamiento y tecnica van bien, prueba 52.5 kg.');
+    expect(result.recommendation).toBe('Si calentamiento y técnica van bien, prueba 52.5 kg.');
   });
 
   it('keeps load when the top rep range is completed with high RPE', () => {
@@ -69,7 +69,7 @@ describe('progression', () => {
   it('recommends maintaining or lowering load below the minimum rep target', () => {
     const result = progressionHintForExercise(planned(), [session('2026-07-10T10:00:00Z', [6, 7], '50')]);
 
-    expect(result.recommendation).toBe('No alcanzaste el minimo objetivo: mantén o baja un poco el peso.');
+    expect(result.recommendation).toBe('No alcanzaste el mínimo objetivo: mantén o baja un poco el peso.');
   });
 
   it('handles bodyweight sets without load metrics', () => {
@@ -78,7 +78,7 @@ describe('progression', () => {
 
     const result = progressionHintForExercise(planned(), [bodyweightSession]);
 
-    expect(result.lastSummary).toBe('Ultima vez: 2 series, 8-9 reps sin peso.');
-    expect(result.recommendation).toBe('Mantén reps controladas o anade carga solo si la tecnica fue solida.');
+    expect(result.lastSummary).toBe('Última vez: 2 series, 8-9 reps sin peso.');
+    expect(result.recommendation).toBe('Mantén reps controladas o añade carga solo si la técnica fue solida.');
   });
 });

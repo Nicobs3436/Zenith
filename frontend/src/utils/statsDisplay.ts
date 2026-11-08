@@ -50,8 +50,14 @@ export function formatStatsDate(value: string) {
   return new Date(value).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
 }
 
+// period_start es una etiqueta de calendario (fecha local de la sesion a medianoche UTC):
+// se formatea en UTC para que no cambie de dia segun la zona del dispositivo.
+export function formatPeriodDate(value: string) {
+  return new Date(value).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', timeZone: 'UTC' });
+}
+
 export function shortStatsDate(value: string) {
-  return new Date(value).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+  return new Date(value).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 }
 
 export function buildStatsChart(points: ExerciseStatsPoint[]) {
@@ -68,7 +74,7 @@ export function buildStatsChart(points: ExerciseStatsPoint[]) {
 export function buildMetricStatsChart(points: ExerciseStatsPoint[], metric: StatsChartMetric) {
   const labels: Record<StatsChartMetric, string> = {
     estimated_1rm: '1RM estimado',
-    max_weight: 'Peso maximo',
+    max_weight: 'Peso máximo',
     volume: 'Volumen total',
   };
   const valueForPoint = (point: ExerciseStatsPoint) => {

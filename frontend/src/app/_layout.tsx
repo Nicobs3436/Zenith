@@ -48,14 +48,15 @@ export default function RootLayout() {
       <Stack.Screen name="routine-new" options={{ title: 'Nueva rutina' }} />
       <Stack.Screen name="routine-edit" options={{ title: 'Editar rutina' }} />
       <Stack.Screen name="sessions" options={{ title: 'Sesiones' }} />
-      <Stack.Screen name="session-active" options={{ title: 'Sesion activa' }} />
-      <Stack.Screen name="session-new" options={{ title: 'Nueva sesion' }} />
-      <Stack.Screen name="session-detail" options={{ title: 'Detalle sesion' }} />
-      <Stack.Screen name="session-edit" options={{ title: 'Editar sesion' }} />
-      <Stack.Screen name="stats" options={{ headerShown: false, title: 'Estadisticas' }} />
+      <Stack.Screen name="session-active" options={{ title: 'Sesión activa' }} />
+      <Stack.Screen name="session-new" options={{ title: 'Nueva sesión' }} />
+      <Stack.Screen name="session-detail" options={{ title: 'Detalle sesión' }} />
+      <Stack.Screen name="session-edit" options={{ title: 'Editar sesión' }} />
+      <Stack.Screen name="stats" options={{ headerShown: false, title: 'Estadísticas' }} />
       <Stack.Screen name="coach" options={{ headerShown: false, title: 'Entrenador IA' }} />
+      <Stack.Screen name="account" options={{ title: 'Cuenta' }} />
       <Stack.Screen name="privacy" options={{ title: 'Privacidad' }} />
-      <Stack.Screen name="terms" options={{ title: 'Terminos' }} />
+      <Stack.Screen name="terms" options={{ title: 'Términos' }} />
     </Stack>
     </>
   );

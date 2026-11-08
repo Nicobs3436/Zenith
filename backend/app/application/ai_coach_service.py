@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -114,7 +114,11 @@ class AiCoachService:
                 suggestion_ids.append(matching.id)
 
         db.commit()
-        return [suggestion for suggestion_id in suggestion_ids if (suggestion := repository.get_by_user(suggestion_id, user.id))]
+        return [
+            suggestion
+            for suggestion_id in suggestion_ids
+            if (suggestion := repository.get_by_user(suggestion_id, user.id))
+        ]
 
     def list_suggestions(self, db: Session, user: User) -> list[AiSuggestion]:
         return AiSuggestionRepository(db).list_by_user(user.id)
@@ -160,11 +164,15 @@ class AiCoachService:
         )
 
         db.commit()
-        return [suggestion for suggestion_id in suggestion_ids if (suggestion := repository.get_by_user(suggestion_id, user.id))]
+        return [
+            suggestion
+            for suggestion_id in suggestion_ids
+            if (suggestion := repository.get_by_user(suggestion_id, user.id))
+        ]
 
     def accept_suggestion(self, db: Session, suggestion_id: UUID, user: User) -> AiSuggestion:
         repository = AiSuggestionRepository(db)
-        suggestion = repository.get_by_user(suggestion_id, user.id)
+        suggestion = repository.get_by_user(suggestion_id, user.id, for_update=True)
         if suggestion is None:
             raise AiSuggestionNotFoundError
         if suggestion.status != "pending":
@@ -395,7 +403,11 @@ class AiCoachService:
                 or routine_exercise.target_reps_max > 12
             ):
                 changes.update({"target_reps_min": 8, "target_reps_max": 12})
-            if routine_exercise.target_sets is None or routine_exercise.target_sets < 2 or routine_exercise.target_sets > 3:
+            if (
+                routine_exercise.target_sets is None
+                or routine_exercise.target_sets < 2
+                or routine_exercise.target_sets > 3
+            ):
                 changes["target_sets"] = 3
             if routine_exercise.rest_seconds is None or routine_exercise.rest_seconds > 120:
                 changes["rest_seconds"] = 90
@@ -442,7 +454,10 @@ class AiCoachService:
             if session.id not in grouped:
                 grouped[session.id] = (session, [])
             grouped[session.id][1].append(workout_set)
-        return [SessionPerformance(session=session, sets=sets) for session, sets in sorted(grouped.values(), key=lambda item: item[0].started_at)]
+        return [
+            SessionPerformance(session=session, sets=sets)
+            for session, sets in sorted(grouped.values(), key=lambda item: item[0].started_at)
+        ]
 
     def _input_summary(
         self, routine: Routine, routine_exercise: RoutineExercise, performances: list[SessionPerformance]
@@ -464,7 +479,9 @@ class AiCoachService:
                 "target_sets": routine_exercise.target_sets,
                 "target_reps_min": routine_exercise.target_reps_min,
                 "target_reps_max": routine_exercise.target_reps_max,
-                "target_weight_value": str(routine_exercise.target_weight_value) if routine_exercise.target_weight_value is not None else None,
+                "target_weight_value": str(routine_exercise.target_weight_value)
+                if routine_exercise.target_weight_value is not None
+                else None,
                 "target_weight_unit": routine_exercise.target_weight_unit,
                 "target_rpe": str(routine_exercise.target_rpe) if routine_exercise.target_rpe is not None else None,
                 "target_rir": routine_exercise.target_rir,
@@ -478,7 +495,9 @@ class AiCoachService:
                         {
                             "set_number": workout_set.set_number,
                             "reps": workout_set.reps,
-                            "weight_value": str(workout_set.weight_value) if workout_set.weight_value is not None else None,
+                            "weight_value": str(workout_set.weight_value)
+                            if workout_set.weight_value is not None
+                            else None,
                             "weight_unit": workout_set.weight_unit,
                             "rpe": str(workout_set.rpe) if workout_set.rpe is not None else None,
                             "rir": workout_set.rir,
@@ -501,8 +520,12 @@ class AiCoachService:
             "avg_reps": str(latest.avg_reps.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)),
             "max_weight": str(latest.max_weight) if latest.max_weight is not None else None,
             "weight_unit": latest.unit,
-            "avg_rpe": str(latest.avg_rpe.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)) if latest.avg_rpe is not None else None,
-            "avg_rir": str(latest.avg_rir.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)) if latest.avg_rir is not None else None,
+            "avg_rpe": str(latest.avg_rpe.quantize(TWO_PLACES, rounding=ROUND_HALF_UP))
+            if latest.avg_rpe is not None
+            else None,
+            "avg_rir": str(latest.avg_rir.quantize(TWO_PLACES, rounding=ROUND_HALF_UP))
+            if latest.avg_rir is not None
+            else None,
             "rep_drop": latest.sets[0].reps - latest.sets[-1].reps if latest.sets else 0,
             "total_volume": str(latest.total_volume) if latest.total_volume is not None else None,
         }
@@ -608,7 +631,9 @@ class AiCoachService:
         current_weight = routine_exercise.target_weight_value or latest.max_weight
         current_unit = routine_exercise.target_weight_unit or latest.unit
         if current_weight is not None and current_weight > 0 and current_unit in {"kg", "lb"}:
-            changes["target_weight_value"] = str((Decimal(current_weight) * Decimal("0.90")).quantize(TWO_PLACES, rounding=ROUND_HALF_UP))
+            changes["target_weight_value"] = str(
+                (Decimal(current_weight) * Decimal("0.90")).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+            )
             changes["target_weight_unit"] = current_unit
 
         if latest.rep_drop >= 3:
@@ -691,7 +716,9 @@ class AiCoachService:
         new_max = max(new_min, latest_avg_reps + 1)
         return {"target_reps_min": new_min, "target_reps_max": new_max}
 
-    def _should_increase_weight(self, latest: SessionPerformance, previous: SessionPerformance, target_reps_max: int) -> bool:
+    def _should_increase_weight(
+        self, latest: SessionPerformance, previous: SessionPerformance, target_reps_max: int
+    ) -> bool:
         if latest.max_weight is None or previous.max_weight is None:
             return False
         if latest.max_weight < previous.max_weight:
@@ -717,7 +744,15 @@ class AiCoachService:
         return len(set(max_weights)) == 1 and len(set(avg_reps)) == 1
 
     def _apply_changes(self, db: Session, user: User, routine_exercise: RoutineExercise, changes: dict) -> None:
-        allowed = {"target_weight_value", "target_weight_unit", "target_sets", "target_reps_min", "target_reps_max", "rest_seconds", "exercise_id"}
+        allowed = {
+            "target_weight_value",
+            "target_weight_unit",
+            "target_sets",
+            "target_reps_min",
+            "target_reps_max",
+            "rest_seconds",
+            "exercise_id",
+        }
         if not set(changes).issubset(allowed):
             raise AiSuggestionCannotApplyError
         self._validate_changes(db, user, routine_exercise, changes)
@@ -756,7 +791,10 @@ class AiCoachService:
                 exercise_id = UUID(str(changes["exercise_id"]))
             except (TypeError, ValueError) as error:
                 raise AiSuggestionCannotApplyError from error
-            if exercise_id == routine_exercise.exercise_id or ExerciseRepository(db).get_accessible(exercise_id, user.id) is None:
+            if (
+                exercise_id == routine_exercise.exercise_id
+                or ExerciseRepository(db).get_accessible(exercise_id, user.id) is None
+            ):
                 raise AiSuggestionCannotApplyError
 
 

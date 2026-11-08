@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+from app.api.users import get_current_user
 from app.application.auth_service import auth_service
 from app.application.exercise_service import ExerciseReferenceError, exercise_service
-from app.api.users import get_current_user
 from app.domain.exercises import ExerciseCreate, ExerciseRead, NamedReference
 from app.infrastructure.db.models.user import User
 from app.infrastructure.db.session import get_db

@@ -99,7 +99,9 @@ class WorkoutSessionRepository:
         statement = (
             select(WorkoutSession)
             .options(selectinload(WorkoutSession.sets))
-            .where(WorkoutSession.id == session_id, WorkoutSession.user_id == user_id, WorkoutSession.deleted_at.is_(None))
+            .where(
+                WorkoutSession.id == session_id, WorkoutSession.user_id == user_id, WorkoutSession.deleted_at.is_(None)
+            )
         )
         return self.db.scalar(statement)
 

@@ -5,20 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.users import get_current_user
-from app.core.config import get_settings
-from app.core.rate_limit import RateLimitExceededError, check_rate_limit
 from app.application.ai_coach_service import (
     AiRoutineAnalysisNotFoundError,
     AiSuggestionCannotApplyError,
     AiSuggestionNotFoundError,
     AiSuggestionNotPendingError,
     ai_coach_service,
-)
-from app.application.coach_service import (
-    CoachCannotGenerateError,
-    CoachPlanNotDraftError,
-    CoachPlanNotFoundError,
-    coach_service,
 )
 from app.application.ai_session_summary_service import (
     AiSessionSummaryCannotGenerateError,
@@ -31,6 +23,14 @@ from app.application.ai_training_plan_service import (
     AiTrainingPlanNotFoundError,
     ai_training_plan_service,
 )
+from app.application.coach_service import (
+    CoachCannotGenerateError,
+    CoachPlanNotDraftError,
+    CoachPlanNotFoundError,
+    coach_service,
+)
+from app.core.config import get_settings
+from app.core.rate_limit import RateLimitExceededError, check_rate_limit
 from app.domain.ai import (
     AiSessionSummaryRead,
     AiSuggestionRead,
@@ -130,7 +130,9 @@ def reject_coach_plan_draft(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Coach plan is not a draft.") from error
 
 
-@router.post("/coach/plan-drafts/{plan_id}/revise", response_model=AiTrainingPlanRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/coach/plan-drafts/{plan_id}/revise", response_model=AiTrainingPlanRead, status_code=status.HTTP_201_CREATED
+)
 def revise_coach_plan_draft(
     plan_id: UUID,
     data: CoachPlanDraftReviseRequest,
@@ -171,7 +173,9 @@ def list_suggestions(
     return ai_coach_service.list_suggestions(db, current_user)
 
 
-@router.post("/routines/{routine_id}/analyze-goal", response_model=list[AiSuggestionRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/routines/{routine_id}/analyze-goal", response_model=list[AiSuggestionRead], status_code=status.HTTP_201_CREATED
+)
 def analyze_routine_goal(
     routine_id: UUID,
     db: Annotated[Session, Depends(get_db)],
@@ -292,7 +296,9 @@ def modify_training_plan(
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
-@router.post("/session-summaries/{session_id}/generate", response_model=AiSessionSummaryRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/session-summaries/{session_id}/generate", response_model=AiSessionSummaryRead, status_code=status.HTTP_201_CREATED
+)
 def generate_session_summary(
     session_id: UUID,
     db: Annotated[Session, Depends(get_db)],

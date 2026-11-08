@@ -10,7 +10,13 @@ type PrimaryButtonProps = {
 
 export function PrimaryButton({ title, onPress, disabled }: PrimaryButtonProps) {
   return (
-    <Pressable disabled={disabled} onPress={onPress} style={[styles.button, disabled && styles.disabled]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
+    >
       <Text style={styles.text}>{title}</Text>
     </Pressable>
   );
@@ -21,7 +27,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: zenith.colors.primary,
     borderRadius: 18,
+    justifyContent: 'center',
+    minHeight: 52,
     padding: 15,
+  },
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.99 }],
   },
   disabled: {
     opacity: 0.55,

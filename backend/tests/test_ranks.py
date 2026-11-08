@@ -1,6 +1,6 @@
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime, timedelta
-from typing import Any, TypeAlias
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,7 +15,7 @@ from app.infrastructure.db.seed import seed_database
 from app.infrastructure.db.session import get_db
 from app.main import app
 
-SessionFactory: TypeAlias = Callable[[], Session]
+type SessionFactory = Callable[[], Session]
 
 
 @pytest.fixture()
@@ -365,3 +365,52 @@ def test_rank_response_returns_no_next_rank_at_max_rank(
     assert data["rank"]["name"] == "Leyenda"
     assert data["next_rank"] is None
     assert data["points_to_next_rank"] is None
+
+
+def test_rank_volume_normalizes_lb_to_kg(client_with_db: tuple[TestClient, SessionFactory]) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    create_session(
+        client,
+        token,
+        str(exercise.id),
+        datetime(2026, 7, 2, 10, 0, tzinfo=UTC),
+        [{"set_number": 1, "reps": 10, "weight_value": "100", "weight_unit": "lb"}],
+    )
+
+    data = client.get("/users/me/rank", headers={"Authorization": f"Bearer {token}"}).json()
+
+    # 100 lb x 10 = 1000 lb = 453.59 kg -> 4.54 puntos.
+    assert data["volume_score"] == "4.54"
+
+
+def test_rank_progression_uses_best_set_of_first_session_as_baseline(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    create_session(
+        client,
+        token,
+        str(exercise.id),
+        datetime(2026, 7, 2, 10, 0, tzinfo=UTC),
+        [
+            {"set_number": 1, "reps": 5, "weight_value": "40", "weight_unit": "kg"},
+            {"set_number": 2, "reps": 5, "weight_value": "100", "weight_unit": "kg"},
+        ],
+    )
+    create_session(
+        client,
+        token,
+        str(exercise.id),
+        datetime(2026, 7, 9, 10, 0, tzinfo=UTC),
+        [{"set_number": 1, "reps": 5, "weight_value": "100", "weight_unit": "kg"}],
+    )
+
+    data = client.get("/users/me/rank", headers={"Authorization": f"Bearer {token}"}).json()
+
+    # El calentamiento de 40 kg no cuenta como referencia: no hay progreso real.
+    assert data["progression_score"] == "0.00"
+    assert data["breadth_score"] == "0.00"

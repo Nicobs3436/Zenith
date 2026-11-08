@@ -16,12 +16,11 @@ Zenith queda preparado para beta gratuita con:
 - No es consejo medico, fisioterapeutico ni de entrenador cualificado.
 - Las recomendaciones IA son revisables; solo aplican cambios al aceptar.
 - Web usa `localStorage` como fallback para tokens; para producto web sensible conviene migrar a cookies `HttpOnly` o BFF.
-- Eliminacion/exportacion automatica de cuenta queda pendiente; durante beta debe gestionarse manualmente por el responsable del despliegue.
+- Exportacion de datos (JSON) y eliminacion permanente de cuenta disponibles en la pantalla Cuenta; la eliminacion pide la contrasena actual y borra todos los datos del usuario.
 - El free tier puede tener cold starts, limites o interrupciones.
 
 ## Checklist Antes De Producto Publico
 
-- Implementar eliminacion/exportacion de cuenta desde la app.
 - Definir canal de soporte/contacto visible.
 - Revisar textos legales con criterio juridico si se abre a usuarios reales.
 - Decidir estrategia de tokens para web productiva.

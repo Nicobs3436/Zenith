@@ -50,7 +50,9 @@ class AiTrainingPlanService:
         if not exercises and not require_ai_provider:
             raise AiTrainingPlanCannotGenerateError("No accessible exercises available.")
 
-        provider_result = self._generate_plan_with_provider(data, exercises, require_ai_provider=require_ai_provider, coach_brief=coach_brief)
+        provider_result = self._generate_plan_with_provider(
+            data, exercises, require_ai_provider=require_ai_provider, coach_brief=coach_brief
+        )
         plan_payload = provider_result.plan_payload
         if coach_brief is not None and plan_payload.get("version") == 3:
             plan_payload["coach_brief"] = coach_brief
@@ -94,7 +96,7 @@ class AiTrainingPlanService:
 
     def accept_plan(self, db: Session, plan_id: UUID, user: User) -> AiTrainingPlan:
         repository = AiTrainingPlanRepository(db)
-        plan = repository.get_by_user(plan_id, user.id)
+        plan = repository.get_by_user(plan_id, user.id, for_update=True)
         if plan is None:
             raise AiTrainingPlanNotFoundError
         if plan.status != "draft":
@@ -303,7 +305,9 @@ class AiTrainingPlanService:
         provider = build_ai_provider()
         if require_ai_provider and getattr(provider, "provider", None) not in STRUCTURAL_AI_PROVIDERS:
             raise AiTrainingPlanCannotGenerateError("Coach V3 requires Groq or Ollama as the AI provider.")
-        context = self._provider_context(data, exercises, modification_instruction=modification_instruction, coach_brief=coach_brief)
+        context = self._provider_context(
+            data, exercises, modification_instruction=modification_instruction, coach_brief=coach_brief
+        )
         if hasattr(provider, "build_training_plan_structure"):
             try:
                 result = provider.build_training_plan_structure(context)
@@ -323,13 +327,17 @@ class AiTrainingPlanService:
                     return result
                 except (AiProviderError, AiTrainingPlanCannotGenerateError):
                     if require_ai_provider:
-                        raise AiTrainingPlanCannotGenerateError("Ollama could not generate a valid Coach V3 plan.")
+                        raise AiTrainingPlanCannotGenerateError(
+                            "Ollama could not generate a valid Coach V3 plan."
+                        ) from None
                     fallback = self._internal_plan_result(data, exercises, provider=provider, fallback_used=True)
                     self._validate_plan_payload(fallback.plan_payload, data, exercises)
                     return fallback
 
         if require_ai_provider:
-            raise AiTrainingPlanCannotGenerateError("Coach V3 requires an AI provider that can generate plan structure.")
+            raise AiTrainingPlanCannotGenerateError(
+                "Coach V3 requires an AI provider that can generate plan structure."
+            )
         fallback = self._internal_plan_result(data, exercises, provider=provider, fallback_used=False)
         self._validate_plan_payload(fallback.plan_payload, data, exercises)
         return fallback
@@ -422,7 +430,9 @@ class AiTrainingPlanService:
                 self._validate_planned_exercise(planned, accessible_exercise_ids)
         self._validate_plan_quality(routines, data, exercises)
 
-    def _validate_plan_payload_v3(self, plan_payload: dict, data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]) -> None:
+    def _validate_plan_payload_v3(
+        self, plan_payload: dict, data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]
+    ) -> None:
         required_sections = [
             "generated_by",
             "program_blueprint",
@@ -463,16 +473,24 @@ class AiTrainingPlanService:
                 self._validate_planned_exercise_v3(planned, accessible_exercise_ids, data)
         self._validate_plan_quality(routines, data, exercises)
 
-    def _validate_planned_exercise_v3(self, planned: dict, accessible_exercise_ids: set[str], data: AiTrainingPlanGenerateRequest) -> None:
+    def _validate_planned_exercise_v3(
+        self, planned: dict, accessible_exercise_ids: set[str], data: AiTrainingPlanGenerateRequest
+    ) -> None:
         if not isinstance(planned, dict):
             raise AiTrainingPlanCannotGenerateError("Generated plan exercise is invalid.")
         source = planned.get("exercise_source") or "ai_generated_pending"
         if source not in {"catalog_matched", "ai_generated_pending", "ai_generated_private"}:
             raise AiTrainingPlanCannotGenerateError("Generated plan exercise source is invalid.")
         exercise_id = planned.get("exercise_id")
-        if source == "catalog_matched" and (not isinstance(exercise_id, str) or exercise_id not in accessible_exercise_ids):
+        if source == "catalog_matched" and (
+            not isinstance(exercise_id, str) or exercise_id not in accessible_exercise_ids
+        ):
             raise AiTrainingPlanCannotGenerateError("Generated plan references an inaccessible exercise.")
-        if source in {"ai_generated_pending", "ai_generated_private"} and exercise_id is not None and not isinstance(exercise_id, str):
+        if (
+            source in {"ai_generated_pending", "ai_generated_private"}
+            and exercise_id is not None
+            and not isinstance(exercise_id, str)
+        ):
             raise AiTrainingPlanCannotGenerateError("Generated plan pending exercise id is invalid.")
         required_strings = [
             "exercise_name",
@@ -509,7 +527,13 @@ class AiTrainingPlanService:
         target_rir = planned.get("target_rir")
         if not isinstance(target_sets, int) or target_sets < 1 or target_sets > 8:
             raise AiTrainingPlanCannotGenerateError("Generated plan target sets are invalid.")
-        if not isinstance(reps_min, int) or not isinstance(reps_max, int) or reps_min < 1 or reps_max > 30 or reps_min > reps_max:
+        if (
+            not isinstance(reps_min, int)
+            or not isinstance(reps_max, int)
+            or reps_min < 1
+            or reps_max > 30
+            or reps_min > reps_max
+        ):
             raise AiTrainingPlanCannotGenerateError("Generated plan target reps are invalid.")
         if not isinstance(rest_seconds, int) or rest_seconds < 45 or rest_seconds > 300:
             raise AiTrainingPlanCannotGenerateError("Generated plan rest is invalid.")
@@ -522,9 +546,15 @@ class AiTrainingPlanService:
         if target_rpe < 6 or target_rpe > 9:
             raise AiTrainingPlanCannotGenerateError("Generated plan target RPE is invalid.")
 
-    def _validate_plan_quality(self, routines: list[dict], data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]) -> None:
+    def _validate_plan_quality(
+        self, routines: list[dict], data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]
+    ) -> None:
         exercise_sets = [
-            {str(planned.get("exercise_id") or planned.get("exercise_name")) for planned in routine.get("exercises", []) if isinstance(planned, dict)}
+            {
+                str(planned.get("exercise_id") or planned.get("exercise_name"))
+                for planned in routine.get("exercises", [])
+                if isinstance(planned, dict)
+            }
             for routine in routines
         ]
         if data.days_per_week > 1 and len(exercises) >= 4 and len({frozenset(item) for item in exercise_sets}) == 1:
@@ -541,7 +571,11 @@ class AiTrainingPlanService:
         else:
             max_sets_per_day = 24
         for routine in routines:
-            total_sets = sum(int(planned.get("target_sets") or 0) for planned in routine.get("exercises", []) if isinstance(planned, dict))
+            total_sets = sum(
+                int(planned.get("target_sets") or 0)
+                for planned in routine.get("exercises", [])
+                if isinstance(planned, dict)
+            )
             if total_sets > max_sets_per_day:
                 raise AiTrainingPlanCannotGenerateError("Generated plan volume is too high for level.")
 
@@ -558,7 +592,13 @@ class AiTrainingPlanService:
         target_rir = planned.get("target_rir")
         if not isinstance(target_sets, int) or target_sets < 1 or target_sets > 10:
             raise AiTrainingPlanCannotGenerateError("Generated plan target sets are invalid.")
-        if not isinstance(reps_min, int) or not isinstance(reps_max, int) or reps_min < 1 or reps_max > 50 or reps_min > reps_max:
+        if (
+            not isinstance(reps_min, int)
+            or not isinstance(reps_max, int)
+            or reps_min < 1
+            or reps_max > 50
+            or reps_min > reps_max
+        ):
             raise AiTrainingPlanCannotGenerateError("Generated plan target reps are invalid.")
         if not isinstance(rest_seconds, int) or rest_seconds < 0 or rest_seconds > 600:
             raise AiTrainingPlanCannotGenerateError("Generated plan rest is invalid.")
@@ -571,7 +611,9 @@ class AiTrainingPlanService:
         if target_rpe < 1 or target_rpe > 10:
             raise AiTrainingPlanCannotGenerateError("Generated plan target RPE is invalid.")
 
-    def _resolve_plan_exercises(self, plan_payload: dict, data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]) -> dict:
+    def _resolve_plan_exercises(
+        self, plan_payload: dict, data: AiTrainingPlanGenerateRequest, exercises: list[Exercise]
+    ) -> dict:
         if plan_payload.get("version") != 3:
             return plan_payload
         by_name = {self._normalize(exercise.name): exercise for exercise in exercises}
@@ -735,7 +777,9 @@ class AiTrainingPlanService:
         used_counts: dict[str, int] = {}
         split = self._split_for(data.days_per_week, data.goal)
         for day_number, focus in enumerate(split, start=1):
-            selected = self._select_exercises_for_focus(exercises, focus, exercises_per_day, used_counts, data.priorities)
+            selected = self._select_exercises_for_focus(
+                exercises, focus, exercises_per_day, used_counts, data.priorities
+            )
             for exercise in selected:
                 used_counts[str(exercise.id)] = used_counts.get(str(exercise.id), 0) + 1
             routines.append(
@@ -755,7 +799,11 @@ class AiTrainingPlanService:
                     ],
                 }
             )
-        return {"version": 2, "routines": routines, "progression": "Revisa rendimiento y tecnica cada 2-3 sesiones; sube carga solo si completas el rango con RIR suficiente."}
+        return {
+            "version": 2,
+            "routines": routines,
+            "progression": "Revisa rendimiento y tecnica cada 2-3 sesiones; sube carga solo si completas el rango con RIR suficiente.",
+        }
 
     def _max_exercises_per_day(self, session_duration_minutes: int) -> int:
         if session_duration_minutes < 45:
@@ -772,7 +820,11 @@ class AiTrainingPlanService:
         if days_per_week == 2:
             return ["full_body_a", "full_body_b"]
         if days_per_week == 3:
-            return ["push", "pull", "legs"] if goal in {"hypertrophy", "strength"} else ["full_body_a", "full_body_b", "full_body_c"]
+            return (
+                ["push", "pull", "legs"]
+                if goal in {"hypertrophy", "strength"}
+                else ["full_body_a", "full_body_b", "full_body_c"]
+            )
         if days_per_week == 4:
             return ["upper", "lower", "upper", "lower"]
         if days_per_week == 5:
@@ -831,7 +883,11 @@ class AiTrainingPlanService:
         priorities: list[str],
     ) -> Exercise | None:
         selected_ids = {exercise.id for exercise in selected}
-        candidates = [exercise for exercise in exercises if exercise.id not in selected_ids and self._matches_category(exercise, category)]
+        candidates = [
+            exercise
+            for exercise in exercises
+            if exercise.id not in selected_ids and self._matches_category(exercise, category)
+        ]
         if not candidates:
             return None
         normalized_priorities = [self._normalize(priority) for priority in priorities]
@@ -865,7 +921,9 @@ class AiTrainingPlanService:
             return "arms"
         if any(marker in text for marker in ["hombro", "deltoide", "elevacion lateral", "press militar"]):
             return "shoulders"
-        if any(marker in text for marker in ["peso muerto", "hip thrust", "curl femoral", "isquio", "bisagra", "lumbar"]):
+        if any(
+            marker in text for marker in ["peso muerto", "hip thrust", "curl femoral", "isquio", "bisagra", "lumbar"]
+        ):
             return "hinge"
         if any(marker in text for marker in ["pierna", "cuadriceps", "sentadilla", "prensa", "zancada", "gluteo"]):
             return "legs"
@@ -902,15 +960,43 @@ class AiTrainingPlanService:
 
     def _prescription_for(self, goal: str, level: str, category: str = "accessory") -> dict:
         if goal == "strength":
-            base = {"target_sets": 4, "target_reps_min": 3, "target_reps_max": 6, "rest_seconds": 180, "target_rpe": "8", "target_rir": 2}
+            base = {
+                "target_sets": 4,
+                "target_reps_min": 3,
+                "target_reps_max": 6,
+                "rest_seconds": 180,
+                "target_rpe": "8",
+                "target_rir": 2,
+            }
             if category in {"arms", "shoulders", "calves", "core", "accessory"}:
                 base = {**base, "target_sets": 3, "target_reps_min": 8, "target_reps_max": 12, "rest_seconds": 90}
         elif goal == "endurance":
-            base = {"target_sets": 2, "target_reps_min": 12, "target_reps_max": 20, "rest_seconds": 60, "target_rpe": "7", "target_rir": 3}
+            base = {
+                "target_sets": 2,
+                "target_reps_min": 12,
+                "target_reps_max": 20,
+                "rest_seconds": 60,
+                "target_rpe": "7",
+                "target_rir": 3,
+            }
         elif goal == "general_health":
-            base = {"target_sets": 2, "target_reps_min": 8, "target_reps_max": 15, "rest_seconds": 75, "target_rpe": "7", "target_rir": 3}
+            base = {
+                "target_sets": 2,
+                "target_reps_min": 8,
+                "target_reps_max": 15,
+                "rest_seconds": 75,
+                "target_rpe": "7",
+                "target_rir": 3,
+            }
         else:
-            base = {"target_sets": 3, "target_reps_min": 8, "target_reps_max": 12, "rest_seconds": 90, "target_rpe": "8", "target_rir": 2}
+            base = {
+                "target_sets": 3,
+                "target_reps_min": 8,
+                "target_reps_max": 12,
+                "rest_seconds": 90,
+                "target_rpe": "8",
+                "target_rir": 2,
+            }
             if category in {"arms", "shoulders", "calves", "core", "accessory"}:
                 base = {**base, "target_reps_min": 10, "target_reps_max": 15, "rest_seconds": 75}
         if level == "beginner":

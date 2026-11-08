@@ -1,6 +1,6 @@
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
-from typing import Any, TypeAlias
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -9,14 +9,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import get_settings
 from app.infrastructure.db.base import Base
 from app.infrastructure.db.models.ai import AiSuggestion
 from app.infrastructure.db.models.exercise import Equipment, Exercise, MuscleGroup
 from app.infrastructure.db.session import get_db
 from app.main import app
-from app.core.config import get_settings
 
-SessionFactory: TypeAlias = Callable[[], Session]
+type SessionFactory = Callable[[], Session]
 
 
 @pytest.fixture()
@@ -70,9 +70,15 @@ def seed_exercise_catalog(session_factory: SessionFactory) -> dict[str, Exercise
         chest = MuscleGroup(name="Chest")
         legs = MuscleGroup(name="Legs")
         machine = Equipment(name="Machine")
-        current = Exercise(name="Bench press", difficulty="beginner", is_global=True, muscle_groups=[chest], equipment=[machine])
-        best = Exercise(name="Chest press", difficulty="beginner", is_global=True, muscle_groups=[chest], equipment=[machine])
-        weaker = Exercise(name="Leg press", difficulty="beginner", is_global=True, muscle_groups=[legs], equipment=[machine])
+        current = Exercise(
+            name="Bench press", difficulty="beginner", is_global=True, muscle_groups=[chest], equipment=[machine]
+        )
+        best = Exercise(
+            name="Chest press", difficulty="beginner", is_global=True, muscle_groups=[chest], equipment=[machine]
+        )
+        weaker = Exercise(
+            name="Leg press", difficulty="beginner", is_global=True, muscle_groups=[legs], equipment=[machine]
+        )
         db.add_all([chest, legs, machine, current, best, weaker])
         db.commit()
         for exercise in [current, best, weaker]:
@@ -170,7 +176,9 @@ def create_session(
     return response.json()
 
 
-def setup_progression_context(client_with_db: tuple[TestClient, SessionFactory]) -> tuple[TestClient, str, dict[str, Any], dict[str, Any]]:
+def setup_progression_context(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> tuple[TestClient, str, dict[str, Any], dict[str, Any]]:
     client, session_factory = client_with_db
     exercise = seed_global_exercise(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
@@ -231,7 +239,9 @@ def test_accept_suggestion_applies_routine_change_without_changing_sessions(
         headers={"Authorization": f"Bearer {token}"},
     )
     routine_response = client.get(f"/routines/{routine['id']}", headers={"Authorization": f"Bearer {token}"})
-    session_response = client.get(f"/workout-sessions/{first_session['id']}", headers={"Authorization": f"Bearer {token}"})
+    session_response = client.get(
+        f"/workout-sessions/{first_session['id']}", headers={"Authorization": f"Bearer {token}"}
+    )
 
     assert response.status_code == 200
     assert response.json()["status"] == "accepted"
@@ -276,8 +286,12 @@ def test_generate_suggestions_does_not_mix_units(client_with_db: tuple[TestClien
     exercise = seed_global_exercise(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
     routine = create_routine(client, token, str(exercise.id))
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 1, 10, 0, tzinfo=UTC), weight_unit="kg")
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 8, 10, 0, tzinfo=UTC), weight_unit="lb")
+    create_session(
+        client, token, routine["id"], str(exercise.id), datetime(2026, 7, 1, 10, 0, tzinfo=UTC), weight_unit="kg"
+    )
+    create_session(
+        client, token, routine["id"], str(exercise.id), datetime(2026, 7, 8, 10, 0, tzinfo=UTC), weight_unit="lb"
+    )
 
     response = client.post("/ai/suggestions/generate", headers={"Authorization": f"Bearer {token}"})
 
@@ -285,7 +299,9 @@ def test_generate_suggestions_does_not_mix_units(client_with_db: tuple[TestClien
     assert response.json() == []
 
 
-def test_generate_suggestions_does_not_duplicate_pending_matches(client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_generate_suggestions_does_not_duplicate_pending_matches(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
     client, token, _routine, _session = setup_progression_context(client_with_db)
 
     first_response = client.post("/ai/suggestions/generate", headers={"Authorization": f"Bearer {token}"})
@@ -305,11 +321,17 @@ def test_generate_suggestions_expires_obsolete_pending_suggestions(
     exercise = seed_global_exercise(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
     routine = create_routine(client, token, str(exercise.id))
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 1, 10, 0, tzinfo=UTC), reps=[10, 7, 6])
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 8, 10, 0, tzinfo=UTC), reps=[10, 7, 6])
+    create_session(
+        client, token, routine["id"], str(exercise.id), datetime(2026, 7, 1, 10, 0, tzinfo=UTC), reps=[10, 7, 6]
+    )
+    create_session(
+        client, token, routine["id"], str(exercise.id), datetime(2026, 7, 8, 10, 0, tzinfo=UTC), reps=[10, 7, 6]
+    )
     first_response = client.post("/ai/suggestions/generate", headers={"Authorization": f"Bearer {token}"})
 
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 15, 10, 0, tzinfo=UTC), reps=[8, 8, 8])
+    create_session(
+        client, token, routine["id"], str(exercise.id), datetime(2026, 7, 15, 10, 0, tzinfo=UTC), reps=[8, 8, 8]
+    )
     second_response = client.post("/ai/suggestions/generate", headers={"Authorization": f"Bearer {token}"})
     list_response = client.get("/ai/suggestions", headers={"Authorization": f"Bearer {token}"})
 
@@ -389,9 +411,13 @@ def test_generate_suggestions_can_recommend_deload_before_reduce_volume(
     }
     assert suggestion["input_summary"]["rule_triggered"] == "repeated_fatigue_deload"
 
-    accept_response = client.post(f"/ai/suggestions/{suggestion['id']}/accept", headers={"Authorization": f"Bearer {token}"})
+    accept_response = client.post(
+        f"/ai/suggestions/{suggestion['id']}/accept", headers={"Authorization": f"Bearer {token}"}
+    )
     routine_response = client.get(f"/routines/{routine['id']}", headers={"Authorization": f"Bearer {token}"})
-    session_response = client.get(f"/workout-sessions/{latest_session['id']}", headers={"Authorization": f"Bearer {token}"})
+    session_response = client.get(
+        f"/workout-sessions/{latest_session['id']}", headers={"Authorization": f"Bearer {token}"}
+    )
 
     assert accept_response.status_code == 200
     planned_exercise = routine_response.json()["exercises"][0]
@@ -409,9 +435,39 @@ def test_generate_suggestions_does_not_recommend_deload_with_mixed_recent_units(
     exercise = seed_global_exercise(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
     routine = create_routine(client, token, str(exercise.id), target_sets=3)
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 1, 10, 0, tzinfo=UTC), weight_unit="lb", reps=[10, 8, 6], rpe="9", rir=0)
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 8, 10, 0, tzinfo=UTC), weight_unit="kg", reps=[10, 8, 6], rpe="9", rir=0)
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 15, 10, 0, tzinfo=UTC), weight_unit="kg", reps=[10, 7, 5], rpe="9", rir=0)
+    create_session(
+        client,
+        token,
+        routine["id"],
+        str(exercise.id),
+        datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
+        weight_unit="lb",
+        reps=[10, 8, 6],
+        rpe="9",
+        rir=0,
+    )
+    create_session(
+        client,
+        token,
+        routine["id"],
+        str(exercise.id),
+        datetime(2026, 7, 8, 10, 0, tzinfo=UTC),
+        weight_unit="kg",
+        reps=[10, 8, 6],
+        rpe="9",
+        rir=0,
+    )
+    create_session(
+        client,
+        token,
+        routine["id"],
+        str(exercise.id),
+        datetime(2026, 7, 15, 10, 0, tzinfo=UTC),
+        weight_unit="kg",
+        reps=[10, 7, 5],
+        rpe="9",
+        rir=0,
+    )
 
     response = client.post("/ai/suggestions/generate", headers={"Authorization": f"Bearer {token}"})
 
@@ -456,9 +512,13 @@ def test_generate_suggestions_can_recommend_exercise_swap(
     assert suggestion["input_summary"]["planned_change"]["exercise_name"] == "Chest press"
     assert suggestion["input_summary"]["rule_triggered"] == "poor_tolerance_exercise_swap"
 
-    accept_response = client.post(f"/ai/suggestions/{suggestion['id']}/accept", headers={"Authorization": f"Bearer {token}"})
+    accept_response = client.post(
+        f"/ai/suggestions/{suggestion['id']}/accept", headers={"Authorization": f"Bearer {token}"}
+    )
     routine_response = client.get(f"/routines/{routine['id']}", headers={"Authorization": f"Bearer {token}"})
-    session_response = client.get(f"/workout-sessions/{first_session['id']}", headers={"Authorization": f"Bearer {token}"})
+    session_response = client.get(
+        f"/workout-sessions/{first_session['id']}", headers={"Authorization": f"Bearer {token}"}
+    )
 
     assert accept_response.status_code == 200
     assert routine_response.json()["exercises"][0]["exercise_id"] == str(catalog["best"].id)
@@ -472,8 +532,26 @@ def test_generate_suggestions_does_not_recommend_exercise_swap_without_alternati
     exercise = seed_global_exercise(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
     routine = create_routine(client, token, str(exercise.id), target_reps_min=8, target_reps_max=12)
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 1, 10, 0, tzinfo=UTC), reps=[6, 5, 4], rpe="9", rir=0)
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 8, 10, 0, tzinfo=UTC), reps=[6, 5, 4], rpe="9", rir=0)
+    create_session(
+        client,
+        token,
+        routine["id"],
+        str(exercise.id),
+        datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
+        reps=[6, 5, 4],
+        rpe="9",
+        rir=0,
+    )
+    create_session(
+        client,
+        token,
+        routine["id"],
+        str(exercise.id),
+        datetime(2026, 7, 8, 10, 0, tzinfo=UTC),
+        reps=[6, 5, 4],
+        rpe="9",
+        rir=0,
+    )
 
     response = client.post("/ai/suggestions/generate", headers={"Authorization": f"Bearer {token}"})
 
@@ -481,7 +559,9 @@ def test_generate_suggestions_does_not_recommend_exercise_swap_without_alternati
     assert all(suggestion["type"] != "exercise_swap" for suggestion in response.json())
 
 
-def test_accept_suggestion_rejects_inaccessible_exercise_swap(client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_accept_suggestion_rejects_inaccessible_exercise_swap(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
     client, token, _routine, _session = setup_progression_context(client_with_db)
     other_token = register_and_login(client, "other@example.com", "other_user")
     private_exercise_id = create_private_exercise(client, other_token)
@@ -524,8 +604,12 @@ def test_generate_suggestions_can_increase_rest(client_with_db: tuple[TestClient
     exercise = seed_global_exercise(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
     routine = create_routine(client, token, str(exercise.id), rest_seconds=120)
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 1, 10, 0, tzinfo=UTC), reps=[10, 7, 6])
-    create_session(client, token, routine["id"], str(exercise.id), datetime(2026, 7, 8, 10, 0, tzinfo=UTC), reps=[10, 7, 6])
+    create_session(
+        client, token, routine["id"], str(exercise.id), datetime(2026, 7, 1, 10, 0, tzinfo=UTC), reps=[10, 7, 6]
+    )
+    create_session(
+        client, token, routine["id"], str(exercise.id), datetime(2026, 7, 8, 10, 0, tzinfo=UTC), reps=[10, 7, 6]
+    )
 
     response = client.post("/ai/suggestions/generate", headers={"Authorization": f"Bearer {token}"})
 
@@ -616,7 +700,9 @@ def test_ollama_provider_enriches_text_without_changing_apply_payload(
     assert "private" not in captured_body["body"]
 
 
-def test_ollama_provider_falls_back_on_invalid_response(client_with_db: tuple[TestClient, SessionFactory], monkeypatch) -> None:
+def test_ollama_provider_falls_back_on_invalid_response(
+    client_with_db: tuple[TestClient, SessionFactory], monkeypatch
+) -> None:
     class FakeResponse:
         def __enter__(self):
             return self
@@ -671,7 +757,9 @@ def test_analyze_routine_goal_generates_strength_adjustment(client_with_db: tupl
         "target_sets": 3,
     }
 
-    accept_response = client.post(f"/ai/suggestions/{suggestion['id']}/accept", headers={"Authorization": f"Bearer {token}"})
+    accept_response = client.post(
+        f"/ai/suggestions/{suggestion['id']}/accept", headers={"Authorization": f"Bearer {token}"}
+    )
     routine_response = client.get(f"/routines/{routine['id']}", headers={"Authorization": f"Bearer {token}"})
 
     assert accept_response.status_code == 200
@@ -699,9 +787,13 @@ def test_other_user_cannot_analyze_routine_goal(client_with_db: tuple[TestClient
     exercise = seed_global_exercise(session_factory)
     owner_token = register_and_login(client, "owner@example.com", "owner_user")
     other_token = register_and_login(client, "other@example.com", "other_user")
-    routine = create_routine(client, owner_token, str(exercise.id), target_reps_min=10, target_reps_max=15, rest_seconds=60)
+    routine = create_routine(
+        client, owner_token, str(exercise.id), target_reps_min=10, target_reps_max=15, rest_seconds=60
+    )
 
-    response = client.post(f"/ai/routines/{routine['id']}/analyze-goal", headers={"Authorization": f"Bearer {other_token}"})
+    response = client.post(
+        f"/ai/routines/{routine['id']}/analyze-goal", headers={"Authorization": f"Bearer {other_token}"}
+    )
 
     assert response.status_code == 404
 
@@ -710,7 +802,9 @@ def test_analyze_routine_goal_deduplicates_pending_matches(client_with_db: tuple
     client, session_factory = client_with_db
     exercise = seed_global_exercise(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
-    routine = create_routine(client, token, str(exercise.id), target_sets=2, target_reps_min=10, target_reps_max=15, rest_seconds=60)
+    routine = create_routine(
+        client, token, str(exercise.id), target_sets=2, target_reps_min=10, target_reps_max=15, rest_seconds=60
+    )
 
     first = client.post(f"/ai/routines/{routine['id']}/analyze-goal", headers={"Authorization": f"Bearer {token}"})
     second = client.post(f"/ai/routines/{routine['id']}/analyze-goal", headers={"Authorization": f"Bearer {token}"})
@@ -719,12 +813,18 @@ def test_analyze_routine_goal_deduplicates_pending_matches(client_with_db: tuple
     assert second.json()[0]["id"] == first.json()[0]["id"]
 
 
-def test_analyze_routine_goal_expires_obsolete_goal_adjustment(client_with_db: tuple[TestClient, SessionFactory]) -> None:
+def test_analyze_routine_goal_expires_obsolete_goal_adjustment(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
     client, session_factory = client_with_db
     exercise = seed_global_exercise(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
-    routine = create_routine(client, token, str(exercise.id), target_sets=2, target_reps_min=10, target_reps_max=15, rest_seconds=60)
-    suggestion = client.post(f"/ai/routines/{routine['id']}/analyze-goal", headers={"Authorization": f"Bearer {token}"}).json()[0]
+    routine = create_routine(
+        client, token, str(exercise.id), target_sets=2, target_reps_min=10, target_reps_max=15, rest_seconds=60
+    )
+    suggestion = client.post(
+        f"/ai/routines/{routine['id']}/analyze-goal", headers={"Authorization": f"Bearer {token}"}
+    ).json()[0]
 
     update_response = client.put(
         f"/routines/{routine['id']}",
@@ -777,7 +877,9 @@ def test_ollama_enriches_routine_goal_adjustment_without_changing_payload(
     client, session_factory = client_with_db
     exercise = seed_global_exercise(session_factory)
     token = register_and_login(client, "owner@example.com", "owner_user")
-    routine = create_routine(client, token, str(exercise.id), target_sets=2, target_reps_min=10, target_reps_max=15, rest_seconds=60)
+    routine = create_routine(
+        client, token, str(exercise.id), target_sets=2, target_reps_min=10, target_reps_max=15, rest_seconds=60
+    )
 
     response = client.post(f"/ai/routines/{routine['id']}/analyze-goal", headers={"Authorization": f"Bearer {token}"})
 

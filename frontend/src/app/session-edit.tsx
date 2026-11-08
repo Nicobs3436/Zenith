@@ -10,7 +10,7 @@ import { SegmentedField } from '@/components/SegmentedField';
 import { ZenithCard, ZenithHeader, ZenithNotice } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
-import { buildWorkoutSets, duplicateSetRow, newSetRow, SetRow, WeightUnit } from '@/utils/sessionForm';
+import { buildWorkoutSets, duplicateSetRow, formatLocalDateTime, newSetRow, SetRow, toIsoDateTime, WeightUnit } from '@/utils/sessionForm';
 
 const UNIT_OPTIONS = [
   { label: 'kg', value: 'kg' },
@@ -46,8 +46,8 @@ export default function EditSessionScreen() {
         setExercises(exerciseItems);
         setRoutines(routineItems);
         setRoutineId(session.routine_id ?? '');
-        setStartedAt(session.started_at);
-        setFinishedAt(session.finished_at ?? '');
+        setStartedAt(formatLocalDateTime(session.started_at));
+        setFinishedAt(session.finished_at ? formatLocalDateTime(session.finished_at) : '');
         setTimezone(session.timezone);
         setNotes(session.notes ?? '');
         setRows(
@@ -95,11 +95,17 @@ export default function EditSessionScreen() {
 
   async function submit() {
     if (!id) {
-      setError('Sesion no encontrada.');
+      setError('Sesión no encontrada.');
       return;
     }
-    if (!startedAt.trim()) {
-      setError('La fecha de inicio es obligatoria.');
+    const startedAtIso = toIsoDateTime(startedAt);
+    if (!startedAtIso) {
+      setError('La fecha de inicio no es válida. Usa el formato AAAA-MM-DD HH:MM.');
+      return;
+    }
+    const finishedAtIso = finishedAt.trim() ? toIsoDateTime(finishedAt) : null;
+    if (finishedAt.trim() && !finishedAtIso) {
+      setError('La fecha de fin no es válida. Usa el formato AAAA-MM-DD HH:MM.');
       return;
     }
     if (!timezone.trim()) {
@@ -113,7 +119,7 @@ export default function EditSessionScreen() {
       return;
     }
     if (result.sets.length === 0) {
-      setError('Necesitas series validas para guardar la sesion.');
+      setError('Necesitas series válidas para guardar la sesión.');
       return;
     }
 
@@ -122,15 +128,15 @@ export default function EditSessionScreen() {
     try {
       await updateWorkoutSession(id, {
         routine_id: routineId || null,
-        started_at: startedAt,
-        finished_at: finishedAt.trim() || null,
+        started_at: startedAtIso,
+        finished_at: finishedAtIso,
         timezone,
         notes: notes.trim() || null,
         sets: result.sets,
       });
       router.replace('/sessions?notice=updated');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'No se pudo guardar la sesion.');
+      setError(caught instanceof Error ? caught.message : 'No se pudo guardar la sesión.');
     } finally {
       setSaving(false);
     }
@@ -141,12 +147,12 @@ export default function EditSessionScreen() {
 
   return (
     <ZenithScreen>
-      <ZenithHeader title="Editar sesion" subtitle="Historial" />
-      {loading && <ZenithNotice>Cargando sesion...</ZenithNotice>}
+      <ZenithHeader title="Editar sesión" subtitle="Historial" />
+      {loading && <ZenithNotice>Cargando sesión...</ZenithNotice>}
       <PickerField label="Rutina opcional" onValueChange={setRoutineId} options={routineOptions} selectedValue={routineId} />
-      <Field label="Inicio ISO" onChangeText={setStartedAt} value={startedAt} />
-      <Field label="Fin ISO opcional" onChangeText={setFinishedAt} value={finishedAt} />
-      <Field label="Zona horaria" onChangeText={setTimezone} value={timezone} />
+      <Field hint="AAAA-MM-DD HH:MM, hora local" label="Inicio" onChangeText={setStartedAt} value={startedAt} />
+      <Field hint="AAAA-MM-DD HH:MM, hora local" label="Fin (opcional)" onChangeText={setFinishedAt} value={finishedAt} />
+      <Field autoCapitalize="none" hint="Zona en la que entrenaste." label="Zona horaria" onChangeText={setTimezone} value={timezone} />
       <Field label="Notas opcionales" multiline onChangeText={setNotes} value={notes} />
       <Text style={styles.section}>Series</Text>
       {rows.map((row, index) => (
@@ -173,23 +179,23 @@ export default function EditSessionScreen() {
           </View>
           <Field label="Notas serie opcionales" multiline onChangeText={(setNotesValue) => updateRow(row.key, { notes: setNotesValue })} value={row.notes} />
           <View style={styles.actionsRow}>
-            <Pressable onPress={() => duplicateRow(row)} style={styles.secondarySmallButton}>
+            <Pressable accessibilityRole="button" onPress={() => duplicateRow(row)} style={styles.secondarySmallButton}>
               <Text style={styles.secondaryText}>Duplicar</Text>
             </Pressable>
             {rows.length > 1 && (
-              <Pressable onPress={() => removeRow(row.key)} style={styles.removeSmallButton}>
+              <Pressable accessibilityRole="button" onPress={() => removeRow(row.key)} style={styles.removeSmallButton}>
                 <Text style={styles.removeText}>Quitar</Text>
               </Pressable>
             )}
           </View>
         </ZenithCard>
       ))}
-      <Pressable onPress={addRow} style={styles.secondaryButton}>
-        <Text style={styles.secondaryText}>Anadir serie</Text>
+      <Pressable accessibilityRole="button" onPress={addRow} style={styles.secondaryButton}>
+        <Text style={styles.secondaryText}>Añadir serie</Text>
       </Pressable>
-      {!id && <ZenithNotice tone="danger">Sesion no encontrada.</ZenithNotice>}
+      {!id && <ZenithNotice tone="danger">Sesión no encontrada.</ZenithNotice>}
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
-      <PrimaryButton disabled={saving || loading || exercises.length === 0} onPress={submit} title={saving ? 'Guardando...' : 'Guardar sesion'} />
+      <PrimaryButton disabled={saving || loading || exercises.length === 0} onPress={submit} title={saving ? 'Guardando...' : 'Guardar sesión'} />
     </ZenithScreen>
   );
 }

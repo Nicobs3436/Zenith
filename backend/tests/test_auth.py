@@ -225,3 +225,14 @@ def test_users_me_requires_token(client: TestClient) -> None:
     response = client.get("/users/me")
 
     assert response.status_code == 401
+
+
+def test_email_is_case_insensitive_for_register_and_login(client: TestClient) -> None:
+    created = client.post("/auth/register", json=user_payload(email="Juan.Perez@Example.com", username="juan"))
+    duplicate = client.post("/auth/register", json=user_payload(email="juan.perez@example.com", username="juan2"))
+    login = client.post("/auth/login", json={"email": "JUAN.PEREZ@example.com", "password": user_payload()["password"]})
+
+    assert created.status_code == 201
+    assert created.json()["email"] == "juan.perez@example.com"
+    assert duplicate.status_code == 409
+    assert login.status_code == 200

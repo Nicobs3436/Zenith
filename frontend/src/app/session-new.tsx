@@ -10,7 +10,7 @@ import { SegmentedField } from '@/components/SegmentedField';
 import { ZenithCard, ZenithHeader, ZenithNotice } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
-import { buildWorkoutSets, duplicateSetRow, newSetRow, rowsFromRoutine, SetRow, WeightUnit } from '@/utils/sessionForm';
+import { buildWorkoutSets, duplicateSetRow, newSetRow, formatLocalDateTime, rowsFromRoutine, SetRow, toIsoDateTime, WeightUnit } from '@/utils/sessionForm';
 
 const UNIT_OPTIONS = [
   { label: 'kg', value: 'kg' },
@@ -22,7 +22,7 @@ export default function NewSessionScreen() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [routineId, setRoutineId] = useState('');
-  const [startedAt, setStartedAt] = useState(new Date().toISOString());
+  const [startedAt, setStartedAt] = useState(() => formatLocalDateTime(new Date()));
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<SetRow[]>([]);
@@ -79,8 +79,9 @@ export default function NewSessionScreen() {
   }
 
   async function submit() {
-    if (!startedAt.trim()) {
-      setError('La fecha de inicio es obligatoria.');
+    const startedAtIso = toIsoDateTime(startedAt);
+    if (!startedAtIso) {
+      setError('La fecha de inicio no es válida. Usa el formato AAAA-MM-DD HH:MM.');
       return;
     }
     if (!timezone.trim()) {
@@ -94,7 +95,7 @@ export default function NewSessionScreen() {
       return;
     }
     if (result.sets.length === 0) {
-      setError('Necesitas series validas para guardar la sesion.');
+      setError('Necesitas series válidas para guardar la sesión.');
       return;
     }
 
@@ -103,14 +104,14 @@ export default function NewSessionScreen() {
     try {
       await createWorkoutSession({
         routine_id: routineId || null,
-        started_at: startedAt,
+        started_at: startedAtIso,
         timezone,
         notes: notes.trim() || null,
         sets: result.sets,
       });
       router.replace('/sessions?notice=created');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'No se pudo registrar la sesion.');
+      setError(caught instanceof Error ? caught.message : 'No se pudo registrar la sesión.');
     } finally {
       setSaving(false);
     }
@@ -121,14 +122,14 @@ export default function NewSessionScreen() {
 
   return (
     <ZenithScreen>
-      <ZenithHeader title="Registrar sesion" subtitle="Entrenamiento libre" />
+      <ZenithHeader title="Registrar sesión" subtitle="Entrenamiento libre" />
       <PickerField label="Rutina opcional" onValueChange={handleRoutineChange} options={routineOptions} selectedValue={routineId} />
-      <Field label="Inicio ISO" onChangeText={setStartedAt} value={startedAt} />
-      <Field label="Zona horaria" onChangeText={setTimezone} value={timezone} />
+      <Field hint="AAAA-MM-DD HH:MM, hora local" label="Inicio" onChangeText={setStartedAt} value={startedAt} />
+      <Field autoCapitalize="none" hint="Detectada automáticamente. Solo cámbiala si entrenaste en otra zona." label="Zona horaria" onChangeText={setTimezone} value={timezone} />
       <Field label="Notas opcionales" multiline onChangeText={setNotes} value={notes} />
       <Text style={styles.section}>Series</Text>
       {loading && <ZenithNotice>Cargando ejercicios y rutinas...</ZenithNotice>}
-      {!loading && exercises.length === 0 && <ZenithNotice>No hay ejercicios disponibles para registrar una sesion.</ZenithNotice>}
+      {!loading && exercises.length === 0 && <ZenithNotice>No hay ejercicios disponibles para registrar una sesión.</ZenithNotice>}
       {rows.map((row, index) => (
         <ZenithCard key={row.key} style={styles.card}>
           <Text style={styles.cardTitle}>Serie {index + 1}</Text>
@@ -153,22 +154,22 @@ export default function NewSessionScreen() {
           </View>
           <Field label="Notas serie opcionales" multiline onChangeText={(setNotesValue) => updateRow(row.key, { notes: setNotesValue })} value={row.notes} />
           <View style={styles.actionsRow}>
-            <Pressable onPress={() => duplicateRow(row)} style={styles.secondarySmallButton}>
+            <Pressable accessibilityRole="button" onPress={() => duplicateRow(row)} style={styles.secondarySmallButton}>
               <Text style={styles.secondaryText}>Duplicar</Text>
             </Pressable>
             {rows.length > 1 && (
-              <Pressable onPress={() => removeRow(row.key)} style={styles.removeSmallButton}>
+              <Pressable accessibilityRole="button" onPress={() => removeRow(row.key)} style={styles.removeSmallButton}>
                 <Text style={styles.removeText}>Quitar</Text>
               </Pressable>
             )}
           </View>
         </ZenithCard>
       ))}
-      <Pressable onPress={addRow} style={styles.secondaryButton}>
-        <Text style={styles.secondaryText}>Anadir serie</Text>
+      <Pressable accessibilityRole="button" onPress={addRow} style={styles.secondaryButton}>
+        <Text style={styles.secondaryText}>Añadir serie</Text>
       </Pressable>
       {error && <ZenithNotice tone="danger">{error}</ZenithNotice>}
-      <PrimaryButton disabled={saving || loading || exercises.length === 0} onPress={submit} title={saving ? 'Guardando...' : 'Guardar sesion'} />
+      <PrimaryButton disabled={saving || loading || exercises.length === 0} onPress={submit} title={saving ? 'Guardando...' : 'Guardar sesión'} />
     </ZenithScreen>
   );
 }

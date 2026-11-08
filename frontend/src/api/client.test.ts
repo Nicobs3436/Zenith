@@ -167,7 +167,7 @@ describe('api client auth refresh', () => {
       status: 'pending',
       input_summary: {},
       recommendation: 'Sube peso',
-      explanation: 'Progresion estable',
+      explanation: 'Progresión estable',
       risk_notes: null,
       confidence: 'high',
       apply_payload: {},
@@ -247,7 +247,7 @@ describe('api client auth refresh', () => {
     await expect(client.getTrainingPlan('plan-1')).resolves.toEqual(plan);
     await expect(client.acceptTrainingPlan('plan-1')).resolves.toEqual({ ...plan, status: 'accepted' });
     await expect(client.rejectTrainingPlan('plan-1')).resolves.toEqual({ ...plan, status: 'rejected' });
-    await expect(client.modifyTrainingPlan('plan-1', { instruction: 'Hazlo a 4 dias', sensitive_data_acknowledged: false })).resolves.toEqual({
+    await expect(client.modifyTrainingPlan('plan-1', { instruction: 'Hazlo a 4 días', sensitive_data_acknowledged: false })).resolves.toEqual({
       ...plan,
       id: 'plan-2',
       input_summary: { modified_from_plan_id: 'plan-1' },
@@ -261,7 +261,7 @@ describe('api client auth refresh', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       6,
       'http://localhost:8000/ai/training-plans/plan-1/modify',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ instruction: 'Hazlo a 4 dias', sensitive_data_acknowledged: false }) }),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ instruction: 'Hazlo a 4 días', sensitive_data_acknowledged: false }) }),
     );
   });
 
@@ -415,5 +415,41 @@ describe('api client auth refresh', () => {
     expect(url).toContain('period=week');
     expect(url).toContain('weight_unit=kg');
     expect(url).toContain('start_date=');
+  });
+});
+
+describe('account endpoints', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.state.accessToken = 'access-token';
+    mocks.state.refreshToken = 'refresh-token';
+  });
+
+  it('exports data and deletes the account clearing local tokens', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ format_version: 1, routines: [] }))
+      .mockResolvedValueOnce(emptyResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const client = await loadClient();
+
+    await expect(client.exportAccountData()).resolves.toMatchObject({ format_version: 1 });
+    await client.deleteAccount('password123');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://localhost:8000/users/me/export', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://localhost:8000/users/me',
+      expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ password: 'password123' }) }),
+    );
+    expect(mocks.state.refreshToken).toBeNull();
+  });
+
+  it('keeps the session when the password is wrong', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({ detail: 'Contraseña incorrecta.' }, 403)));
+    const client = await loadClient();
+
+    await expect(client.deleteAccount('wrong')).rejects.toThrow('Contraseña incorrecta.');
+    expect(mocks.state.refreshToken).toBe('refresh-token');
   });
 });

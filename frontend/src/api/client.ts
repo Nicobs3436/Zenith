@@ -718,7 +718,7 @@ export function getExercise(exerciseId: string) {
   return request<unknown>(`/exercises/${exerciseId}`, { auth: true }).then((item) => {
     const exercise = normalizeExercise(item);
     if (!exercise) {
-      throw new Error('El ejercicio recibido no es valido.');
+      throw new Error('El ejercicio recibido no es válido.');
     }
     return exercise;
   });
@@ -744,7 +744,7 @@ export function getRoutine(routineId: string) {
   return request<unknown>(`/routines/${routineId}`, { auth: true }).then((item) => {
     const routine = normalizeRoutine(item);
     if (!routine) {
-      throw new Error('La rutina recibida no es valida.');
+      throw new Error('La rutina recibida no es válida.');
     }
     return routine;
   });
@@ -858,7 +858,7 @@ export function getWorkoutSession(sessionId: string) {
   return request<unknown>(`/workout-sessions/${sessionId}`, { auth: true }).then((item) => {
     const session = normalizeWorkoutSession(item);
     if (!session) {
-      throw new Error('La sesion recibida no es valida.');
+      throw new Error('La sesión recibida no es válida.');
     }
     return session;
   });
@@ -918,4 +918,14 @@ export function getExerciseStatsDetail(
     params.set('weight_unit', options.weightUnit);
   }
   return request<ExerciseStatsDetail>(`/stats/exercises/${exerciseId}?${params.toString()}`, { auth: true });
+}
+
+export function exportAccountData() {
+  return request<Record<string, unknown>>('/users/me/export', { auth: true });
+}
+
+export async function deleteAccount(password: string) {
+  await request<void>('/users/me', { method: 'DELETE', auth: true, body: { password } });
+  // El backend ya revoco los refresh tokens al borrar la cuenta; solo queda limpiar el dispositivo.
+  await clearAuthTokens();
 }

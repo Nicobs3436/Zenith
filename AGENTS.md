@@ -19,6 +19,8 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - `uv run python -m app.infrastructure.db.seed` — carga seeds idempotentes de musculos, equipamiento, ejercicios globales y rangos.
 - `uv run uvicorn app.main:app --reload` — arranca la API en desarrollo.
 - `uv run pytest` — ejecuta los tests del backend.
+- `uv run ruff check .` / `uv run ruff format .` — lint y formato del backend (CI exige ambos).
+- `uv` en esta maquina Windows puede necesitar `--native-tls` para descargar paquetes.
 - Tests de auth/API usan SQLite en memoria con override de `get_db`; migraciones se verifican contra PostgreSQL local.
 - Frontend: ejecutar comandos desde `frontend/`.
 - `npm install` — instala dependencias del frontend.
@@ -27,11 +29,14 @@ Aplicacion para gestionar rutinas de gimnasio, registrar entrenamientos y asisti
 - `npm run lint` — ejecuta lint del frontend.
 - `npm run test` — ejecuta tests frontend con Vitest.
 - `npx tsc --noEmit` — ejecuta typecheck frontend.
-- Tests frontend actuales cubren helpers de formularios, progresion, formato stats/rank, mensajes auth y cliente API; tests de pantallas todavia no configurados.
+- Tests frontend actuales cubren helpers de formularios, progresion, formato stats/rank, mensajes auth, cliente API, borrador de sesion activa y temporizadores; tests de pantallas todavia no configurados.
+- UI: textos visibles en espanol con tildes; todo `Pressable` con `accessibilityRole`; botones solo-icono con `label`; objetivos tactiles >= 44 px; texto >= 11 px; casillas con `ZenithCheckbox`.
+- Fechas: el backend normaliza `started_at`/`finished_at` a UTC al recibirlas y responde siempre con offset (SQLite descarta zonas).
 - Frontend persiste access y refresh token con `expo-secure-store`; fallback web actual usa `localStorage`.
-- Pendiente backend: lint, format, typecheck y build todavia no estan configurados.
+- Pendiente backend: typecheck (mypy/pyright) todavia no esta configurado.
 - Deploy fase 20: coste 0 con Render Free para backend Docker, Neon Free para PostgreSQL, Vercel Free para web/PWA, GitHub Actions Free para CI e IA `groq` en staging/produccion para Coach V3 con clave en secreto.
-- Producto fase 21: beta gratuita Zenith con branding, privacidad/terminos estaticos, aviso medico visible y aceptacion antes de registro; eliminacion/exportacion automatica queda pendiente.
+- Producto fase 21: beta gratuita Zenith con branding, privacidad/terminos estaticos, aviso medico visible y aceptacion antes de registro; exportacion JSON (`GET /users/me/export`) y eliminacion permanente con contrasena (`DELETE /users/me`) desde la pantalla Cuenta.
+- Sesion activa: borrador local troceado en `expo-secure-store` (web: `localStorage`) para recuperarla si se cierra la app; se borra al finalizar/cancelar o tras 24 h.
 
 ## Estructura del proyecto
 - `backend/` — API FastAPI, SQLAlchemy/Alembic, PostgreSQL local, estructura por capas y tests.

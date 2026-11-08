@@ -1,6 +1,6 @@
+import json
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
-import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -160,7 +160,9 @@ def test_other_user_cannot_generate_or_read_session_summary(client_with_db: tupl
         f"/ai/session-summaries/{session['id']}/generate",
         headers={"Authorization": f"Bearer {other_token}"},
     )
-    get_response = client.get(f"/ai/session-summaries/{session['id']}", headers={"Authorization": f"Bearer {other_token}"})
+    get_response = client.get(
+        f"/ai/session-summaries/{session['id']}", headers={"Authorization": f"Bearer {other_token}"}
+    )
 
     assert generate_response.status_code == 404
     assert get_response.status_code == 404
@@ -187,8 +189,12 @@ def test_regenerate_session_summary_updates_existing_row(client_with_db: tuple[T
     token = register_and_login(client, "owner@example.com", "owner_user")
     session = create_session(client, token, str(exercise.id))
 
-    first = client.post(f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"}).json()
-    second = client.post(f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"}).json()
+    first = client.post(
+        f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"}
+    ).json()
+    second = client.post(
+        f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"}
+    ).json()
 
     assert second["id"] == first["id"]
 
@@ -204,13 +210,27 @@ def test_session_summary_keeps_kg_and_lb_volumes_separate(client_with_db: tuple[
             "started_at": datetime(2026, 7, 8, 10, 0, tzinfo=UTC).isoformat(),
             "timezone": "Europe/Madrid",
             "sets": [
-                {"exercise_id": str(exercise.id), "set_number": 1, "reps": 10, "weight_value": "50", "weight_unit": "kg"},
-                {"exercise_id": str(exercise.id), "set_number": 2, "reps": 10, "weight_value": "100", "weight_unit": "lb"},
+                {
+                    "exercise_id": str(exercise.id),
+                    "set_number": 1,
+                    "reps": 10,
+                    "weight_value": "50",
+                    "weight_unit": "kg",
+                },
+                {
+                    "exercise_id": str(exercise.id),
+                    "set_number": 2,
+                    "reps": 10,
+                    "weight_value": "100",
+                    "weight_unit": "lb",
+                },
             ],
         },
     ).json()
 
-    response = client.post(f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"})
+    response = client.post(
+        f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"}
+    )
 
     assert response.status_code == 201
     data = response.json()
@@ -251,7 +271,9 @@ def test_ollama_enriches_session_summary_without_notes(
     token = register_and_login(client, "owner@example.com", "owner_user")
     session = create_session(client, token, str(exercise.id))
 
-    response = client.post(f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"})
+    response = client.post(
+        f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"}
+    )
 
     get_settings.cache_clear()
     assert response.status_code == 201
@@ -287,7 +309,9 @@ def test_ollama_session_summary_falls_back_on_invalid_response(
     token = register_and_login(client, "owner@example.com", "owner_user")
     session = create_session(client, token, str(exercise.id))
 
-    response = client.post(f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"})
+    response = client.post(
+        f"/ai/session-summaries/{session['id']}/generate", headers={"Authorization": f"Bearer {token}"}
+    )
 
     get_settings.cache_clear()
     assert response.status_code == 201

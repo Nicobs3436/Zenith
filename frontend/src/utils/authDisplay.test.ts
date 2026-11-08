@@ -4,7 +4,7 @@ import { loginErrorMessage, registerErrorMessage, SESSION_EXPIRED_NOTICE } from 
 
 describe('authDisplay', () => {
   it('exposes a stable session expired notice', () => {
-    expect(SESSION_EXPIRED_NOTICE).toBe('Tu sesion ha caducado. Vuelve a iniciar sesion.');
+    expect(SESSION_EXPIRED_NOTICE).toBe('Tu sesión ha caducado. Vuelve a iniciar sesión.');
   });
 
   it('formats invalid login credentials', () => {
@@ -28,7 +28,7 @@ describe('authDisplay', () => {
     expect(registerErrorMessage(new Error('password: String should have at least 8 characters'))).toBe('El password debe tener al menos 8 caracteres.');
     expect(registerErrorMessage(new Error('username: String should have at least 3 characters'))).toBe('El username debe tener al menos 3 caracteres.');
     expect(registerErrorMessage(new Error('username: String should match pattern'))).toBe('El username solo puede usar letras, numeros y guion bajo.');
-    expect(registerErrorMessage(new Error('email: value is not a valid email address'))).toBe('Revisa que el email sea valido.');
+    expect(registerErrorMessage(new Error('email: value is not a valid email address'))).toBe('Revisa que el email sea válido.');
   });
 
   it('keeps unknown backend messages when no mapping matches', () => {
@@ -36,7 +36,7 @@ describe('authDisplay', () => {
   });
 
   it('uses fallback for non-error values', () => {
-    expect(loginErrorMessage('bad')).toBe('No se pudo iniciar sesion.');
+    expect(loginErrorMessage('bad')).toBe('No se pudo iniciar sesión.');
     expect(registerErrorMessage('bad')).toBe('No se pudo crear la cuenta.');
   });
 });

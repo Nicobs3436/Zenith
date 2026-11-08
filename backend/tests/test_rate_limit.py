@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.core import rate_limit
 from app.core.config import get_settings
 from app.core.rate_limit import RateLimitExceededError, check_rate_limit, rate_limit_bucket_count
-from tests.test_ai_training_plans import SessionFactory, client_with_db, register_and_login  # noqa: F401
+from tests.test_ai_training_plans import SessionFactory, client_with_db, register_and_login  # noqa: F401  fixture de pytest
 
 
 def test_rate_limit_blocks_after_limit() -> None:
@@ -41,7 +41,9 @@ def test_ai_endpoints_are_rate_limited_per_user(monkeypatch, client_with_db: tup
     body = {"message": "Hola", "personal_data_acknowledged": True}
 
     statuses = [client.post("/ai/coach/messages", headers=headers, json=body).status_code for _ in range(3)]
-    other_status = client.post("/ai/coach/messages", headers={"Authorization": f"Bearer {other}"}, json=body).status_code
+    other_status = client.post(
+        "/ai/coach/messages", headers={"Authorization": f"Bearer {other}"}, json=body
+    ).status_code
     get_settings.cache_clear()
 
     assert statuses[:2] == [200, 200]

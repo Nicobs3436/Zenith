@@ -1,4 +1,5 @@
 import { RoutineExercise } from '@/api/client';
+import { normalizeDecimalInput } from '@/utils/sessionForm';
 
 export type RoutineExerciseRow = {
   key: string;
@@ -51,13 +52,13 @@ export function routineExerciseToRow(exercise: RoutineExercise): RoutineExercise
 }
 
 function parseOptionalNumber(value: string, label: string, min: number, max?: number) {
-  const trimmed = value.trim();
+  const trimmed = normalizeDecimalInput(value);
   if (!trimmed) {
     return { value: null, error: null };
   }
   const parsed = Number(trimmed);
   if (Number.isNaN(parsed) || parsed < min || (max !== undefined && parsed > max)) {
-    return { value: null, error: `${label} no es valido.` };
+    return { value: null, error: `${label} no es válido.` };
   }
   return { value: parsed, error: null };
 }
@@ -69,7 +70,7 @@ function parseOptionalInteger(value: string, label: string, min: number) {
   }
   const parsed = Number(trimmed);
   if (!Number.isInteger(parsed) || parsed < min) {
-    return { value: null, error: `${label} no es valido.` };
+    return { value: null, error: `${label} no es válido.` };
   }
   return { value: parsed, error: null };
 }
@@ -82,7 +83,7 @@ export function buildRoutineExercises(rows: RoutineExerciseRow[]): BuildRoutineE
   const exercises: RoutineExercise[] = [];
   for (const [index, row] of rows.entries()) {
     if (!row.exercise_id) {
-      return { exercises: null, error: `El ejercicio ${index + 1} necesita una seleccion.` };
+      return { exercises: null, error: `El ejercicio ${index + 1} necesita una selección.` };
     }
 
     const targetSets = parseOptionalInteger(row.target_sets, `Las series del ejercicio ${index + 1}`, 1);
@@ -109,7 +110,7 @@ export function buildRoutineExercises(rows: RoutineExerciseRow[]): BuildRoutineE
       return { exercises: null, error: targetRpe.error };
     }
 
-    const targetWeight = parseOptionalNumber(row.target_weight_value, `El peso objetivo del ejercicio ${index + 1}`, 0);
+    const targetWeight = parseOptionalNumber(row.target_weight_value, `El peso objetivo del ejercicio ${index + 1}`, 0, 2500);
     if (targetWeight.error) {
       return { exercises: null, error: targetWeight.error };
     }
@@ -131,9 +132,9 @@ export function buildRoutineExercises(rows: RoutineExerciseRow[]): BuildRoutineE
       target_reps_min: targetRepsMin.value,
       target_reps_max: targetRepsMax.value,
       ...(targetWeight.value !== null
-        ? { target_weight_value: row.target_weight_value.trim(), target_weight_unit: row.target_weight_unit }
+        ? { target_weight_value: normalizeDecimalInput(row.target_weight_value), target_weight_unit: row.target_weight_unit }
         : {}),
-      ...(targetRpe.value !== null ? { target_rpe: row.target_rpe.trim() } : {}),
+      ...(targetRpe.value !== null ? { target_rpe: normalizeDecimalInput(row.target_rpe) } : {}),
       ...(targetRir.value !== null ? { target_rir: targetRir.value } : {}),
       ...(restSeconds.value !== null ? { rest_seconds: restSeconds.value } : {}),
       ...(row.notes.trim() ? { notes: row.notes.trim() } : {}),

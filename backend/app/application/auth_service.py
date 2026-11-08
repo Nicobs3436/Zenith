@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -41,11 +42,17 @@ class AuthService:
         if repository.get_by_username(data.username) is not None:
             raise DuplicateUserError("username")
 
-        return repository.create(
-            email=str(data.email),
-            username=data.username,
-            password_hash=hash_password(data.password),
-        )
+        try:
+            return repository.create(
+                email=str(data.email),
+                username=data.username,
+                password_hash=hash_password(data.password),
+            )
+        except IntegrityError as error:
+            # Dos registros simultaneos con el mismo email/username: 409 en vez de 500.
+            db.rollback()
+            field = "username" if repository.get_by_email(str(data.email)) is None else "email"
+            raise DuplicateUserError(field) from error
 
     def authenticate_user(self, db: Session, email: str, password: str) -> User | None:
         user = UserRepository(db).get_by_email(email)

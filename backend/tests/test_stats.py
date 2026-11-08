@@ -1,6 +1,6 @@
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
-from typing import Any, TypeAlias
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +13,7 @@ from app.infrastructure.db.models.exercise import Exercise, MuscleGroup
 from app.infrastructure.db.session import get_db
 from app.main import app
 
-SessionFactory: TypeAlias = Callable[[], Session]
+type SessionFactory = Callable[[], Session]
 
 
 @pytest.fixture()
@@ -369,7 +369,7 @@ def test_stats_overview_returns_kpis_volume_muscles_and_top_exercises(
         "total_sets": 4,
         "session_count": 3,
         "training_hours": "1.50",
-        "pr_count": 3,
+        "pr_count": 0,
     }
     assert data["volume_by_unit"] == [
         {"weight_unit": "kg", "total_volume": "1440.00"},
@@ -380,9 +380,27 @@ def test_stats_overview_returns_kpis_volume_muscles_and_top_exercises(
         {"name": "Espalda", "total_sets": 1},
     ]
     assert data["volume_points"] == [
-        {"period_start": "2026-07-06T00:00:00Z", "weight_unit": "kg", "total_volume": "800.00", "total_sets": 2, "session_count": 1},
-        {"period_start": "2026-07-13T00:00:00Z", "weight_unit": "kg", "total_volume": "640.00", "total_sets": 1, "session_count": 1},
-        {"period_start": "2026-07-13T00:00:00Z", "weight_unit": "lb", "total_volume": "1000.00", "total_sets": 1, "session_count": 1},
+        {
+            "period_start": "2026-07-06T00:00:00Z",
+            "weight_unit": "kg",
+            "total_volume": "800.00",
+            "total_sets": 2,
+            "session_count": 1,
+        },
+        {
+            "period_start": "2026-07-13T00:00:00Z",
+            "weight_unit": "kg",
+            "total_volume": "640.00",
+            "total_sets": 1,
+            "session_count": 1,
+        },
+        {
+            "period_start": "2026-07-13T00:00:00Z",
+            "weight_unit": "lb",
+            "total_volume": "1000.00",
+            "total_sets": 1,
+            "session_count": 1,
+        },
     ]
     assert data["top_exercises"][0]["exercise_name"] == "Barbell row"
     assert data["top_exercises"][0]["best_estimated_1rm"] == "101.33"
@@ -416,3 +434,79 @@ def test_stats_overview_filters_weight_unit_without_mixing_units(
     assert data["kpis"]["total_sets"] == 1
     assert data["volume_by_unit"] == [{"weight_unit": "kg", "total_volume": "500.00"}]
     assert {point["weight_unit"] for point in data["volume_points"]} == {"kg"}
+
+
+def test_stats_overview_counts_only_real_personal_records(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
+    client, session_factory = client_with_db
+    bench = seed_global_exercise(session_factory, name="Bench press", muscle_names=["Pecho"])
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    for day, weight in [(1, "100"), (8, "110"), (15, "105"), (22, "115")]:
+        create_session(
+            client,
+            token,
+            str(bench.id),
+            datetime(2026, 7, day, 10, 0, tzinfo=UTC),
+            [{"set_number": 1, "reps": 5, "weight_value": weight, "weight_unit": "kg"}],
+        )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    all_time = client.get("/stats/overview", headers=headers).json()
+    last_week = client.get(
+        "/stats/overview",
+        headers=headers,
+        params={"start_date": datetime(2026, 7, 14, 0, 0, tzinfo=UTC).isoformat()},
+    ).json()
+
+    assert all_time["kpis"]["pr_count"] == 2
+    assert last_week["kpis"]["pr_count"] == 1
+
+
+def test_stats_group_days_by_session_local_timezone(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    # 23:30 UTC del 8 de julio = 01:30 del 9 de julio en Madrid.
+    create_session(
+        client,
+        token,
+        str(exercise.id),
+        datetime(2026, 7, 8, 23, 30, tzinfo=UTC),
+        [{"set_number": 1, "reps": 10, "weight_value": "50", "weight_unit": "kg"}],
+    )
+
+    response = client.get(
+        f"/stats/exercises/{exercise.id}",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"period": "day"},
+    )
+
+    assert response.json()["points"][0]["period_start"].startswith("2026-07-09")
+
+
+def test_stats_ignore_zero_rep_sets_for_max_and_high_rep_sets_for_1rm(
+    client_with_db: tuple[TestClient, SessionFactory],
+) -> None:
+    client, session_factory = client_with_db
+    exercise = seed_global_exercise(session_factory)
+    token = register_and_login(client, "owner@example.com", "owner_user")
+    create_session(
+        client,
+        token,
+        str(exercise.id),
+        datetime(2026, 7, 8, 10, 0, tzinfo=UTC),
+        [
+            {"set_number": 1, "reps": 0, "weight_value": "200", "weight_unit": "kg"},
+            {"set_number": 2, "reps": 20, "weight_value": "100", "weight_unit": "kg"},
+            {"set_number": 3, "reps": 3, "weight_value": "90", "weight_unit": "kg"},
+        ],
+    )
+
+    data = client.get("/stats/exercises", headers={"Authorization": f"Bearer {token}"}).json()[0]
+
+    assert data["max_weight"] == "100.00"
+    # Solo la serie de 3 reps entra en Epley: 90 * (1 + 3/30) = 99.
+    assert data["best_estimated_1rm"] == "99.00"

@@ -20,8 +20,10 @@ class AiSuggestionRepository:
         )
         return list(self.db.scalars(statement).all())
 
-    def get_by_user(self, suggestion_id: UUID, user_id: UUID) -> AiSuggestion | None:
+    def get_by_user(self, suggestion_id: UUID, user_id: UUID, *, for_update: bool = False) -> AiSuggestion | None:
         statement = select(AiSuggestion).where(AiSuggestion.id == suggestion_id, AiSuggestion.user_id == user_id)
+        if for_update:
+            statement = statement.with_for_update()
         return self.db.scalar(statement)
 
     def list_pending_by_routine_exercise(self, *, user_id: UUID, routine_exercise_id: UUID) -> list[AiSuggestion]:

@@ -1,7 +1,7 @@
-export const SESSION_EXPIRED_NOTICE = 'Tu sesion ha caducado. Vuelve a iniciar sesion.';
+export const SESSION_EXPIRED_NOTICE = 'Tu sesión ha caducado. Vuelve a iniciar sesión.';
 
 export function loginErrorMessage(error: unknown) {
-  return friendlyAuthErrorMessage(error, 'No se pudo iniciar sesion.');
+  return friendlyAuthErrorMessage(error, 'No se pudo iniciar sesión.');
 }
 
 export function registerErrorMessage(error: unknown) {
@@ -34,7 +34,7 @@ function friendlyAuthErrorMessage(error: unknown, fallback: string) {
     return 'El username solo puede usar letras, numeros y guion bajo.';
   }
   if (normalized.includes('email')) {
-    return 'Revisa que el email sea valido.';
+    return 'Revisa que el email sea válido.';
   }
 
   return message || fallback;

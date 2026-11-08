@@ -143,7 +143,7 @@ En free tier, revisar limites de Neon. Antes de cambios importantes:
 
 ## Antes De Producto
 
-- Decidir politicas legales: privacidad, terminos, eliminacion/exportacion de cuenta y disclaimer medico.
+- Decidir politicas legales: privacidad, terminos y disclaimer medico (exportacion y eliminacion de cuenta ya disponibles en la app).
 - Sustituir rate limit en memoria por Redis/edge si hay multiinstancia o abuso.
 - Si se publica web como producto, revisar estrategia de tokens; `localStorage` es solo fallback de desarrollo.
 - Anadir observabilidad basica: logs, alertas y tracking de errores.

@@ -14,7 +14,7 @@ import {
   sendCoachMessage,
 } from '@/api/client';
 import { Field } from '@/components/Field';
-import { ZenithBottomNav, ZenithButton, ZenithCard, ZenithHeader, ZenithNotice, ZenithPill } from '@/components/ZenithUI';
+import { ZenithBottomNav, ZenithButton, ZenithCard, ZenithCheckbox, ZenithHeader, ZenithNotice, ZenithPill } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
 
@@ -53,7 +53,7 @@ function goalLabel(value: string | null) {
   const labels: Record<string, string> = {
     strength: 'Fuerza',
     hypertrophy: 'Hipertrofia',
-    fat_loss: 'Perdida de grasa',
+    fat_loss: 'Pérdida de grasa',
     general_health: 'Salud general',
     endurance: 'Resistencia',
   };
@@ -227,7 +227,7 @@ export default function CoachScreen() {
       await reviseCoachPlanDraft(planId, { instruction, sensitive_data_acknowledged: sensitiveAck });
       setChanges((current) => ({ ...current, [planId]: '' }));
       await loadState();
-      setNotice('Coach creo una nueva version del plan con tus cambios.');
+      setNotice('Coach creo una nueva versión del plan con tus cambios.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No se pudo modificar el plan.');
     } finally {
@@ -280,7 +280,7 @@ export default function CoachScreen() {
 
       {state && (
         <ZenithCard style={styles.chatCard}>
-          <Text style={styles.sectionTitle}>Conversacion</Text>
+          <Text style={styles.sectionTitle}>Conversación</Text>
           {state.recent_messages.length === 0 && <View style={styles.assistantBubble}><Text style={styles.chatText}>{state.assistant_message}</Text></View>}
           {state.recent_messages.map((item, index) => (
             <View key={`${item.role}-${index}`} style={item.role === 'user' ? styles.userBubble : styles.assistantBubble}>
@@ -288,21 +288,18 @@ export default function CoachScreen() {
             </View>
           ))}
           <View style={styles.ackBox}>
-            <Pressable onPress={() => setPersonalAck((current) => !current)} style={[styles.checkbox, personalAck && styles.checkboxChecked]}>
-              <Text style={styles.checkboxText}>{personalAck ? 'Datos personales confirmados' : 'Confirmo uso de datos personales de entrenamiento'}</Text>
-            </Pressable>
-            <Pressable onPress={() => setSensitiveAck((current) => !current)} style={[styles.checkbox, sensitiveAck && styles.checkboxChecked]}>
-              <Text style={styles.checkboxText}>{sensitiveAck ? 'Aviso medico confirmado' : 'Confirmo aviso medico si menciono dolor/lesiones'}</Text>
-            </Pressable>
+            <ZenithCheckbox checked={personalAck} label="Acepto que el Coach use mis datos personales de entrenamiento" onChange={setPersonalAck} />
+            <ZenithCheckbox checked={sensitiveAck} label="Acepto el aviso médico si menciono dolor o lesiones" onChange={setSensitiveAck} />
+            {!personalAck && <Text style={styles.ackHint}>Marca la primera casilla para poder escribir al Coach.</Text>}
           </View>
-          <Field label="Habla con tu Coach" multiline maxLength={1500} onChangeText={setMessage} placeholder="Ej: acepto el aviso. Tengo 29 anos, 180 cm, 80 kg, quiero hipertrofia, soy intermedio, 4 dias, 60 min, gimnasio completo..." value={message} />
+          <Field label="Habla con tu Coach" multiline maxLength={1500} onChangeText={setMessage} placeholder="Ej: acepto el aviso. Tengo 29 años, 180 cm, 80 kg, quiero hipertrofia, soy intermedio, 4 días, 60 min, gimnasio completo..." value={message} />
           <View style={styles.actions}>
             <ZenithButton disabled={sending || !message.trim() || !personalAck} onPress={submitMessage} title={sending ? 'Enviando...' : 'Enviar mensaje'} />
-            <Pressable disabled={!state.ready_for_plan || generating} onPress={submitGeneratePlan} style={[styles.primaryAction, (!state.ready_for_plan || generating) && styles.disabled]}>
+            <Pressable accessibilityRole="button" disabled={!state.ready_for_plan || generating} onPress={submitGeneratePlan} style={[styles.primaryAction, (!state.ready_for_plan || generating) && styles.disabled]}>
               <Sparkles color={zenith.colors.primaryForeground} size={14} />
               <Text style={styles.primaryActionText}>{generating ? 'Creando vista previa...' : 'Generar vista previa'}</Text>
             </Pressable>
-            <Pressable disabled={sending} onPress={submitReset} style={[styles.secondaryAction, sending && styles.disabled]}>
+            <Pressable accessibilityRole="button" disabled={sending} onPress={submitReset} style={[styles.secondaryAction, sending && styles.disabled]}>
               <RotateCcw color={zenith.colors.muted} size={14} />
               <Text style={styles.secondaryActionText}>Reiniciar Coach</Text>
             </Pressable>
@@ -357,7 +354,7 @@ export default function CoachScreen() {
               ))}
             </View>
             <View style={styles.previewBox}>
-              <Text style={styles.previewTitle}>Progresion</Text>
+              <Text style={styles.previewTitle}>Progresión</Text>
               <Text style={styles.cardText}>{progressionSummary(plan) || textValue(plan.plan_payload.progression)}</Text>
             </View>
             {Object.keys(coachReport(plan)).length > 0 && (
@@ -387,7 +384,7 @@ export default function CoachScreen() {
             )}
             {planRoutines(plan).map((routine, index) => (
               <View key={`${plan.id}-routine-${index}`} style={styles.routinePreview}>
-                <Text style={styles.previewTitle}>Dia {textValue(routine.day, String(index + 1))}: {textValue(routine.name, 'Sesion')}</Text>
+                <Text style={styles.previewTitle}>Dia {textValue(routine.day, String(index + 1))}: {textValue(routine.name, 'Sesión')}</Text>
                 <Text style={styles.cardText}>{textValue(routine.description)}</Text>
                 {asRecords(routine.exercises).map((exercise, exerciseIndex) => (
                   <View key={`${plan.id}-routine-${index}-exercise-${exerciseIndex}`} style={styles.exercisePreview}>
@@ -401,15 +398,15 @@ export default function CoachScreen() {
             ))}
             <Field label="Pedir cambios" multiline maxLength={1000} onChangeText={(value) => setChanges((current) => ({ ...current, [plan.id]: value }))} placeholder="Ej: baja volumen de pierna y cambia press banca por mancuernas" value={changes[plan.id] ?? ''} />
             <View style={styles.inlineActions}>
-              <Pressable disabled={working === plan.id} onPress={() => submitAcceptPlan(plan.id)} style={[styles.primaryAction, working === plan.id && styles.disabled]}>
+              <Pressable accessibilityRole="button" disabled={working === plan.id} onPress={() => submitAcceptPlan(plan.id)} style={[styles.primaryAction, working === plan.id && styles.disabled]}>
                 <Check color={zenith.colors.primaryForeground} size={14} />
                 <Text style={styles.primaryActionText}>Aceptar y crear rutinas</Text>
               </Pressable>
-              <Pressable disabled={working === plan.id || !changes[plan.id]?.trim()} onPress={() => submitModifyPlan(plan.id)} style={[styles.secondaryAction, (working === plan.id || !changes[plan.id]?.trim()) && styles.disabled]}>
+              <Pressable accessibilityRole="button" disabled={working === plan.id || !changes[plan.id]?.trim()} onPress={() => submitModifyPlan(plan.id)} style={[styles.secondaryAction, (working === plan.id || !changes[plan.id]?.trim()) && styles.disabled]}>
                 <Sparkles color={zenith.colors.muted} size={14} />
-                <Text style={styles.secondaryActionText}>Crear version ajustada</Text>
+                <Text style={styles.secondaryActionText}>Crear versión ajustada</Text>
               </Pressable>
-              <Pressable disabled={working === plan.id} onPress={() => submitRejectPlan(plan.id)} style={[styles.dangerAction, working === plan.id && styles.disabled]}>
+              <Pressable accessibilityRole="button" disabled={working === plan.id} onPress={() => submitRejectPlan(plan.id)} style={[styles.dangerAction, working === plan.id && styles.disabled]}>
                 <X color="#fecaca" size={14} />
                 <Text style={styles.dangerActionText}>Rechazar</Text>
               </Pressable>
@@ -422,6 +419,7 @@ export default function CoachScreen() {
 }
 
 const styles = StyleSheet.create({
+  ackHint: { color: zenith.colors.amber, fontFamily: zenith.font.body, fontSize: 13 },
   headerIcon: { alignItems: 'center', backgroundColor: zenith.colors.primarySoft, borderRadius: 999, height: 38, justifyContent: 'center', width: 38 },
   subtitle: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 14, lineHeight: 22 },
   heroCard: { borderColor: zenith.colors.primaryBorder, gap: 12 },
@@ -436,9 +434,6 @@ const styles = StyleSheet.create({
   userBubble: { alignSelf: 'flex-end', backgroundColor: zenith.colors.primarySoft, borderColor: zenith.colors.primaryBorder, borderRadius: 16, borderWidth: 1, maxWidth: '92%', padding: 12 },
   chatText: { color: zenith.colors.foreground, fontFamily: zenith.font.body, lineHeight: 20 },
   ackBox: { backgroundColor: zenith.colors.card, borderColor: zenith.colors.border, borderRadius: 16, borderWidth: 1, gap: 10, padding: 12 },
-  checkbox: { alignItems: 'center', borderColor: zenith.colors.border, borderRadius: 12, borderWidth: 1, padding: 12 },
-  checkboxChecked: { backgroundColor: zenith.colors.primarySoft, borderColor: zenith.colors.primary },
-  checkboxText: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, textAlign: 'center' },
   actions: { gap: 10 },
   inlineActions: { gap: 10, marginTop: 4 },
   primaryAction: { alignItems: 'center', backgroundColor: zenith.colors.primary, borderRadius: 12, flexDirection: 'row', gap: 7, justifyContent: 'center', padding: 12 },

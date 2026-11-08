@@ -9,21 +9,22 @@ export default function PrivacyScreen() {
   return (
     <ZenithScreen>
       <ZenithHeader title="Privacidad" subtitle="Zenith beta" />
-      <Text style={styles.text}>Zenith guarda datos de cuenta y entrenamiento para que puedas consultar rutinas, sesiones, estadisticas, rangos y recomendaciones.</Text>
+      <Text style={styles.text}>Zenith guarda datos de cuenta y entrenamiento para que puedas consultar rutinas, sesiones, estadísticas, rangos y recomendaciones.</Text>
       <ZenithCard style={styles.card}>
         <Text style={styles.cardTitle}>Datos que guardamos</Text>
         <Text style={styles.item}>- Email, username y password hasheado.</Text>
         <Text style={styles.item}>- Ejercicios propios, rutinas, sesiones, series, pesos, unidades, RPE/RIR, descansos y notas.</Text>
-        <Text style={styles.item}>- Sugerencias IA, planes adaptativos y resumenes post-sesion generados para tu cuenta.</Text>
+        <Text style={styles.item}>- Sugerencias IA, planes adaptativos y resúmenes post-sesion generados para tu cuenta.</Text>
       </ZenithCard>
       <ZenithCard style={styles.card}>
         <Text style={styles.cardTitle}>IA y datos sensibles</Text>
-        <Text style={styles.item}>- La IA usa reglas internas por defecto y no aplica cambios sin aceptacion.</Text>
-        <Text style={styles.item}>- Las notas privadas no se envian a la IA.</Text>
-        <Text style={styles.item}>- Las limitaciones fisicas pueden ser datos sensibles y solo se usan si confirmas el aviso.</Text>
+        <Text style={styles.item}>- Las sugerencias de progresión usan reglas internas. El Coach usa un proveedor externo (Groq) y solo recibe tus mensajes después de que aceptes el aviso de datos personales.</Text>
+        <Text style={styles.item}>- La IA nunca aplica cambios sin tu aceptación. Las notas privadas no se envian a la IA.</Text>
+        <Text style={styles.item}>- Las limitaciones físicas pueden ser datos sensibles y solo se usan si confirmas el aviso.</Text>
       </ZenithCard>
-      <ZenithNotice tone="warning">Beta gratuita: la eliminacion/exportacion automatica de cuenta queda pendiente. Durante beta, solicita eliminacion o exportacion al responsable del despliegue.</ZenithNotice>
-      <Link href={'/terms' as never} style={styles.link}>Ver terminos</Link>
+      <ZenithNotice>Puedes exportar todos tus datos o eliminar tu cuenta de forma permanente desde Cuenta.</ZenithNotice>
+      <Link href={'/account' as never} style={styles.link}>Ir a Cuenta</Link>
+      <Link href={'/terms' as never} style={styles.link}>Ver términos</Link>
     </ZenithScreen>
   );
 }

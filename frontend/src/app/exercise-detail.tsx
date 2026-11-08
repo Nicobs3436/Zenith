@@ -7,7 +7,7 @@ import { Exercise, ExerciseStatsDetail, getExercise, getExerciseStatsDetail } fr
 import { ZenithCard, ZenithHeader, ZenithNotice, ZenithPill } from '@/components/ZenithUI';
 import { ZenithScreen } from '@/components/ZenithScreen';
 import { zenith } from '@/constants/zenithTheme';
-import { buildStatsChart, formatStatsDate, formatStatsPoint } from '@/utils/statsDisplay';
+import { buildStatsChart, formatPeriodDate, formatStatsPoint } from '@/utils/statsDisplay';
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -79,20 +79,20 @@ export default function ExerciseDetailScreen() {
           </ZenithCard>
 
           <View style={styles.metaGrid}>
-            <InfoCard label="Musculos" value={referenceNames(exercise.muscle_groups)} />
+            <InfoCard label="Músculos" value={referenceNames(exercise.muscle_groups)} />
             <InfoCard label="Equipo" value={referenceNames(exercise.equipment)} />
           </View>
 
           {exercise.description && (
             <ZenithCard style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Descripcion</Text>
+              <Text style={styles.sectionTitle}>Descripción</Text>
               <Text style={styles.body}>{exercise.description}</Text>
             </ZenithCard>
           )}
 
           {exercise.technique_notes && (
             <ZenithCard style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Tecnica</Text>
+              <Text style={styles.sectionTitle}>Técnica</Text>
               <Text style={styles.body}>{exercise.technique_notes}</Text>
             </ZenithCard>
           )}
@@ -127,7 +127,7 @@ function StatsPreview({ stats }: { stats: ExerciseStatsDetail }) {
   const latestPoint = stats.points[stats.points.length - 1];
   return (
     <View style={styles.statsPreview}>
-      <Text style={styles.body}>{formatStatsDate(latestPoint.period_start)} · {formatStatsPoint(latestPoint, latestPoint.weight_unit)}</Text>
+      <Text style={styles.body}>{formatPeriodDate(latestPoint.period_start)} · {formatStatsPoint(latestPoint, latestPoint.weight_unit)}</Text>
       <View style={styles.chart}>
         {visibleBars.map((bar, index) => {
           const height = max > 0 ? Math.max(8, Math.round((bar.value / max) * 72)) : 8;
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   meta: { color: zenith.colors.muted, fontFamily: zenith.font.body, fontSize: 12 },
   metaGrid: { flexDirection: 'row', gap: 10 },
   infoCard: { flex: 1, gap: 6, padding: 13 },
-  infoLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 10, textTransform: 'uppercase' },
+  infoLabel: { color: zenith.colors.muted, fontFamily: zenith.font.mono, fontSize: 11, textTransform: 'uppercase' },
   infoValue: { color: zenith.colors.foreground, fontFamily: zenith.font.bodyBold, lineHeight: 20 },
   sectionCard: { gap: 8 },
   sectionTitle: { color: zenith.colors.foreground, fontFamily: zenith.font.display, fontSize: 22, lineHeight: 24, textTransform: 'uppercase' },

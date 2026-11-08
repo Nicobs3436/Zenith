@@ -28,6 +28,4 @@ class UserRankProgress(Base):
     volume_score: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     progression_score: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     breadth_score: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    calculated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

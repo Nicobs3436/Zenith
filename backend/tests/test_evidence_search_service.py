@@ -48,10 +48,12 @@ def test_search_many_fetches_pubmed_cards_and_deduplicates(monkeypatch) -> None:
 
     monkeypatch.setattr("app.application.evidence_search_service.urlopen", fake_urlopen)
 
-    result = EvidenceSearchService().search_many([
-        "resistance training hypertrophy volume systematic review meta analysis",
-        "resistance training hypertrophy volume systematic review meta analysis",
-    ])
+    result = EvidenceSearchService().search_many(
+        [
+            "resistance training hypertrophy volume systematic review meta analysis",
+            "resistance training hypertrophy volume systematic review meta analysis",
+        ]
+    )
 
     assert result["search_queries"] == ["resistance training hypertrophy volume systematic review meta analysis"]
     assert len(result["used_references"]) == 1

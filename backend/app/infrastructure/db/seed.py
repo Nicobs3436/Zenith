@@ -34,15 +34,11 @@ def seed_database(db: Session) -> None:
     equipment_items = {name: get_or_create_equipment(db, name) for name in EQUIPMENT}
 
     for data in EXERCISES:
-        exercise = db.scalar(
-            select(Exercise).where(Exercise.name == data["name"], Exercise.is_global.is_(True))
-        )
+        exercise = db.scalar(select(Exercise).where(Exercise.name == data["name"], Exercise.is_global.is_(True)))
         for legacy_name in data.get("legacy_names", []):
             if exercise is not None:
                 break
-            exercise = db.scalar(
-                select(Exercise).where(Exercise.name == legacy_name, Exercise.is_global.is_(True))
-            )
+            exercise = db.scalar(select(Exercise).where(Exercise.name == legacy_name, Exercise.is_global.is_(True)))
 
         if exercise is None:
             db.add(
